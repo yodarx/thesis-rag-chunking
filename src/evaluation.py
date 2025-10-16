@@ -9,7 +9,7 @@ def _normalize_text(text: str) -> str:
     return text
 
 
-def calculate_metrics(retrieved_chunks: list[str], gold_passages: list[str], k: int):
+def calculate_metrics(retrieved_chunks: list[str], gold_passages: list[str], k: int, question: str = ""):
     """
     Berechnet die Metriken Precision@k, Recall und MRR.
     """
@@ -23,11 +23,20 @@ def calculate_metrics(retrieved_chunks: list[str], gold_passages: list[str], k: 
     first_hit_rank = 0
 
     for rank, chunk in enumerate(norm_retrieved_chunks, 1):
-        for passage in norm_gold_passages:
+        for i, passage in enumerate(norm_gold_passages):
             if passage in chunk:
                 found_passages.add(passage)
                 if first_hit_rank == 0:
                     first_hit_rank = rank
+
+                # Print match information
+                print(f"\n{'='*60}")
+                print(f"MATCH FOUND!")
+                print(f"Question: {question}")
+                print(f"Matched Chunk: {retrieved_chunks[rank-1]}")
+                print(f"Gold Standard: {gold_passages[i]}")
+                print(f"Rank: {rank}")
+                print(f"{'='*60}")
 
     mrr = 1 / first_hit_rank if first_hit_rank > 0 else 0.0
 
