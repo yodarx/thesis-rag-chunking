@@ -1,93 +1,130 @@
-# thesis-rag-chunking
+# RAG Chunking Strategy Evaluation Framework
 
+This project provides a comprehensive and modular framework for evaluating the impact of different text chunking strategies on retrieval performance. It is designed to be extensible, testable, and easy to run.
 
+The framework processes the ASQA dataset, chunks the documents using various methods (Fixed-Size, Sentence, Recursive, Semantic), indexes them using FAISS, and then evaluates retrieval performance based on the dataset's gold-standard passages using metrics like MRR, MAP, and NDCG@k.
 
-## Getting started
+---
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## 🚀 Features
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+* **Modular Preprocessing:** A standalone script to fetch, parse, and clean ASQA data from Wikipedia.
+* **Multiple Chunking Strategies:**
+    * Fixed-Size
+    * Sentence-based
+    * RecursiveCharacterText
+    * Semantic (similarity-based)
+* **Vector-Based Retrieval:** Uses `sentence-transformers` for embedding and `faiss-cpu` for efficient similarity search.
+* **Comprehensive Evaluation:** Calculates MRR, MAP, NDCG@k, Precision@k, Recall@k, and F1-Score@k for each strategy.
+* **Automated Visualization:** Generates bar charts (Performance vs. Strategy) and scatter plots (Cost-Benefit vs. Compute Time) for all metrics.
+* **Clean & Testable Code:** Fully type-hinted, modular, and testable code using Dependency Injection and a clean separation of concerns.
 
-## Add your files
+---
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## 📦 Project Structure
+
+The project uses a `src` layout and a main `run.py` script for orchestration.
 
 ```
-cd existing_repo
-git remote add origin https://git.ffhs.ch/jeremy.rhodes/thesis-rag-chunking.git
-git branch -M main
-git push -uf origin main
+
+thesis-rag-chunking/
+├── run.py                \<-- Main experiment orchestrator
+├── requirements.txt      \<-- Project dependencies
+├── data/
+│   └── processed/        \<-- Output of the preprocessor (e.g., asqa\_preprocessed.jsonl)
+├── src/
+│   ├── **init**.py       \<-- Makes 'src' a package
+│   ├── preprocessor/     \<-- ASQA data downloader and parser
+│   ├── chunking/         \<-- All chunking strategy modules (fixed, semantic, etc.)
+│   ├── vectorizer/       \<-- SentenceTransformer wrapper
+│   ├── experiment/       \<-- Core logic (runner, retriever, results)
+│   ├── evaluation/       \<-- Retrieval metrics calculation
+│   └── plotting/         \<-- Visualization (matplotlib/seaborn)
+├── results/              \<-- Output CSVs and plots
+└── tests/                \<-- Pytest unit and integration tests
+
+````
+
+---
+
+## 🛠️ Setup & Installation
+
+**Prerequisite:** This project requires **Python 3.12+**.
+
+1.  **Clone the Repository:**
+    ```bash
+    git clone [https://your-repository-url.com/thesis-rag-chunking.git](https://your-repository-url.com/thesis-rag-chunking.git)
+    cd thesis-rag-chunking
+    ```
+
+2.  **Create and Activate a Virtual Environment:**
+    ```bash
+    # Create venv
+    python3 -m venv venv
+    
+    # Activate venv (macOS/Linux)
+    source venv/bin/activate
+    
+    # (Windows)
+    # .\venv\Scripts\activate
+    ```
+
+3.  **Install Dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Download NLTK Data:**
+    The chunking strategies require the NLTK `punkt` tokenizer. Run this command once to download it:
+    ```bash
+    python -m nltk.downloader punkt
+    ```
+
+---
+
+## ⚙️ How to Run the Experiments
+
+The workflow is a two-step process. All commands **must be run from the project's root directory** (`thesis-rag-chunking/`) for the imports to work correctly.
+
+### Step 1: Run the Preprocessor
+
+First, you must download and process the ASQA dataset. This script runs as a standalone module.
+
+```bash
+# This will fetch Wikipedia data and create the .jsonl file in data/processed/
+python -m src.preprocessor.preprocessor
+````
+
+*Note: This script has a `PREPROCESS_LIMIT` variable at the top, which is useful for quick testing. Set it to `None` to process the entire dataset.*
+
+### Step 2: Run the Main Experiment
+
+After the preprocessor has finished, you can run the main experiment pipeline. This will load the `.jsonl` file, run all chunking experiments, calculate metrics, and save the results.
+
+```bash
+python run.py
 ```
 
-## Integrate with your tools
+-----
 
-- [ ] [Set up project integrations](https://git.ffhs.ch/jeremy.rhodes/thesis-rag-chunking/-/settings/integrations)
+## 📊 Viewing Results
 
-## Collaborate with your team
+All outputs from `run.py` are saved in a timestamped folder inside the `results/` directory (e.g., `results/2025-10-23_13-30-00/`).
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+  * `_detailed_results.csv`: A CSV file with the metrics for **every single data point** and experiment.
+  * `_summary_results.csv`: A CSV file with the **aggregated (mean) results** for each experiment strategy.
+  * `*.png`: All generated plots (bar charts and scatter plots) for easy analysis.
 
-## Test and Deploy
+The aggregated results are also printed directly to the console at the end of the run.
 
-Use the built-in continuous integration in GitLab.
+-----
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+## 🧪 Running Tests
 
-***
+This project uses `pytest` for testing. The tests are located in the `tests/` directory and mirror the `src/` structure.
 
-# Editing this README
+To run all tests, ensure your `venv` is active and run the following command from the project root:
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+pytest
+```

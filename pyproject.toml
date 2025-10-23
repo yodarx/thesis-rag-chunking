@@ -1,0 +1,37 @@
+[tool.taskipy.tasks]
+test = "pytest"
+lint = "ruff check ."
+format = "ruff format ."
+lint_format_write = "ruff check . --fix && ruff format ."
+start = "python main.py"
+
+[tool.pytest.ini_options]
+pythonpath = [
+    ".",
+    "src"
+]
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [
+    "cache",
+    "data",
+    "notebooks",
+    ".venv",
+    ".pytest_cache",
+    "venv",
+    "docs",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "UP", "N", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["S101"]
