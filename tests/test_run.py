@@ -52,7 +52,13 @@ def test_run_main_workflow(mock_dependencies):
     """Testet den gesamten Ablauf der main()-Funktion in run.py."""
 
     dummy_input_path = "dummy/input.jsonl"
-    run.main(input_filepath=dummy_input_path, limit=None)
+    run.main(
+        input_filepath=dummy_input_path,
+        limit=None,
+        embedding_model_name="mock_model",
+        retriever_type="faiss",
+        top_k=5,
+    )
 
     # --- 1. Setup-Phase prüfen ---
     mock_dependencies["create_dir"].assert_called_once()
@@ -86,8 +92,37 @@ def test_run_main_no_data(mock_dependencies):
     """Testet, ob das Skript korrekt abbricht, wenn keine Daten geladen werden."""
     mock_dependencies["load_data"].return_value = []
     dummy_input_path = "dummy/input.jsonl"
-    run.main(input_filepath=dummy_input_path, limit=None)
+    run.main(
+        input_filepath=dummy_input_path,
+        limit=None,
+        embedding_model_name="mock_model",
+        retriever_type="faiss",
+        top_k=5,
+    )
 
     mock_dependencies["Runner"].assert_not_called()
     mock_dependencies["visualize"].assert_not_called()
     mock_dependencies["load_data"].assert_called_once_with(dummy_input_path, limit=None)
+
+
+def test_run_main_unknown_retriever_type(mock_dependencies, capsys):
+    """Test that main() exits with error for unknown retriever_type."""
+    import sys
+
+    dummy_input_path = "dummy/input.jsonl"
+    original_exit = sys.exit
+    sys.exit = lambda code=1: (_ for _ in ()).throw(SystemExit(code))
+    try:
+        with pytest.raises(SystemExit) as excinfo:
+            run.main(
+                input_filepath=dummy_input_path,
+                limit=None,
+                embedding_model_name="mock_model",
+                retriever_type="unknown",
+                top_k=5,
+            )
+        assert excinfo.value.code == 1
+        captured = capsys.readouterr()
+        assert "Error: Unknown retriever type" in captured.out
+    finally:
+        sys.exit = original_exit

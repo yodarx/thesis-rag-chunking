@@ -5,9 +5,6 @@ from chunking.chunk_recursive import chunk_recursive
 from chunking.chunk_semantic import chunk_semantic
 from chunking.chunk_sentence import chunk_by_sentence
 
-INPUT_FILE_PATH: str = "data/processed/asqa_preprocessed_plain.jsonl"
-TOP_K_FOR_METRICS: int = 5
-
 
 def get_experiments() -> list[dict[str, Any]]:
     """Definiert alle Chunking-Strategien, die getestet werden sollen."""

@@ -5,7 +5,6 @@ from datetime import datetime
 
 from src.experiment.data_loader import load_asqa_dataset
 from src.experiment.experiment import (
-    TOP_K_FOR_METRICS,
     get_experiments,
 )
 from src.experiment.results import ResultsHandler
@@ -25,7 +24,13 @@ def _create_output_directory() -> (str, str):
     return output_dir, timestamp
 
 
-def main(input_filepath: str, limit: int | None):
+def main(
+    input_filepath: str,
+    limit: int | None,
+    embedding_model_name: str,
+    retriever_type: str,
+    top_k: int,
+):
     output_dir, timestamp = _create_output_directory()
     experiments = get_experiments()
 
@@ -34,10 +39,16 @@ def main(input_filepath: str, limit: int | None):
         print("Dataset could not be loaded. Exiting.")
         return
 
-    print("Initializing Vectorizer...")
-    vectorizer = Vectorizer.from_model_name()
-    retriever = FaissRetriever(vectorizer)
-    # Cacher-Initialisierung entfernt
+    print(f"Initializing Vectorizer with {embedding_model_name}...")
+    vectorizer = Vectorizer.from_model_name(model_name=embedding_model_name)
+
+    if retriever_type == "faiss":
+        print(f"Using FAISS Retriever with top_k={top_k}.")
+        retriever = FaissRetriever(vectorizer)
+    else:
+        print(f"Error: Unknown retriever type '{retriever_type}'. Only 'faiss' is supported.")
+        sys.exit(1)
+
     results_handler = ResultsHandler(output_dir, timestamp)
 
     runner = ExperimentRunner(
@@ -46,7 +57,7 @@ def main(input_filepath: str, limit: int | None):
         vectorizer=vectorizer,
         retriever=retriever,
         results_handler=results_handler,
-        top_k=TOP_K_FOR_METRICS,
+        top_k=top_k,
     )
 
     summary_df = runner.run_all()
@@ -63,7 +74,7 @@ if __name__ == "__main__":
         "-i",
         "--input",
         type=str,
-        required=True,  # Make input file mandatory
+        required=True,
         help="Path to the preprocessed input JSONL file (e.g., data/processed/preprocessed_....jsonl).",
     )
     parser.add_argument(
@@ -73,6 +84,31 @@ if __name__ == "__main__":
         default=None,
         help="Limit the number of dataset entries to process (default: process all).",
     )
+    parser.add_argument(
+        "--embedding-model",
+        type=str,
+        default="all-MiniLM-L6-v2",
+        help="Name of the Sentence Transformer model to use for embeddings.",
+    )
+    parser.add_argument(
+        "--retriever-type",
+        type=str,
+        default="faiss",
+        choices=["faiss"],
+        help="Type of retriever to use (currently only 'faiss').",
+    )
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        default=5,
+        help="Number of top results to retrieve (retriever's K).",
+    )
     args = parser.parse_args()
 
-    main(input_filepath=args.input, limit=args.limit)
+    main(
+        input_filepath=args.input,
+        limit=args.limit,
+        embedding_model_name=args.embedding_model,
+        retriever_type=args.retriever_type,
+        top_k=args.top_k,
+    )
