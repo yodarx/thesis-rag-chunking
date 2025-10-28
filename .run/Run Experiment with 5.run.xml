@@ -15,7 +15,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="run.py" />
-    <option name="PARAMETERS" value="-i ./data/preprocessed/preprocessed_2025-10-23_limit_5.jsonl" />
+    <option name="PARAMETERS" value="--config-json configs/base_experiment.json" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

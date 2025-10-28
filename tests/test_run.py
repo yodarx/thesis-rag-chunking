@@ -1,4 +1,5 @@
-from unittest.mock import Mock
+import json
+import os
 
 import pandas as pd
 import pytest
@@ -17,13 +18,11 @@ def mock_dependencies(mocker: MockerFixture):
 
     # Mocke die Funktionen
     mock_load_data = mocker.patch("run.load_asqa_dataset")
-    mock_get_exps = mocker.patch("run.get_experiments")
     mock_visualize = mocker.patch("run.visualize_and_save_results")
     mock_create_dir = mocker.patch("run._create_output_directory")
 
     # Konfiguriere Rückgabewerte
     mock_create_dir.return_value = ("mock_dir", "mock_ts")
-    mock_get_exps.return_value = [{"name": "mock_exp"}]
     mock_load_data.return_value = [{"id": 1}]
 
     # Mocke die Instanzen, die von den Konstruktoren zurückgegeben werden
@@ -36,7 +35,6 @@ def mock_dependencies(mocker: MockerFixture):
 
     return {
         "load_data": mock_load_data,
-        "get_exps": mock_get_exps,
         "visualize": mock_visualize,
         "create_dir": mock_create_dir,
         "Vector": mock_vectorizer_cls,
@@ -48,81 +46,83 @@ def mock_dependencies(mocker: MockerFixture):
     }
 
 
-def test_run_main_workflow(mock_dependencies):
-    """Testet den gesamten Ablauf der main()-Funktion in run.py."""
+def test_run_main_workflow(mock_dependencies, mocker):
+    config_path = "configs/base_experiment.json"
+    with open(config_path) as f:
+        config_data = json.load(f)
+    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
+    mocker.patch("json.load", return_value=config_data)
+    mocker.patch("shutil.copy")
 
-    dummy_input_path = "dummy/input.jsonl"
-    run.main(
-        input_filepath=dummy_input_path,
-        limit=None,
-        embedding_model_name="mock_model",
-        retriever_type="faiss",
-        top_k=5,
-    )
+    run.main(config_json=config_path)
 
-    # --- 1. Setup-Phase prüfen ---
     mock_dependencies["create_dir"].assert_called_once()
-    mock_dependencies["get_exps"].assert_called_once()
-    mock_dependencies["load_data"].assert_called_once_with(dummy_input_path, limit=None)
-
-    # --- 2. Initialisierungs-Phase prüfen ---
+    mock_dependencies["load_data"].assert_called_once_with(
+        config_data["input_file"], limit=config_data["limit"]
+    )
     mock_dependencies["Vector"].from_model_name.assert_called_once()
     mock_dependencies["Retriever"].assert_called_once()
     mock_dependencies["Results"].assert_called_once_with("mock_dir", "mock_ts")
-
-    # --- 3. Runner-Initialisierung prüfen ---
     mock_dependencies["Runner"].assert_called_once()
-    runner_call_args = mock_dependencies["Runner"].call_args[1]  # Check keyword args
-    assert runner_call_args["dataset"] == [{"id": 1}]
-    assert runner_call_args["experiments"] == [{"name": "mock_exp"}]
-    assert isinstance(runner_call_args["vectorizer"], Mock)
-    assert isinstance(runner_call_args["retriever"], Mock)
-    assert isinstance(runner_call_args["results_handler"], Mock)
-
-    # --- 4. Ausführungs-Phase prüfen ---
     mock_dependencies["runner_inst"].run_all.assert_called_once()
-
-    # --- 5. Visualisierungs-Phase prüfen ---
     mock_dependencies["visualize"].assert_called_once_with(
         mock_dependencies["summary_df"], "mock_dir", "mock_ts"
     )
 
 
-def test_run_main_no_data(mock_dependencies):
-    """Testet, ob das Skript korrekt abbricht, wenn keine Daten geladen werden."""
+def test_run_main_no_data(mock_dependencies, mocker):
+    config_path = "configs/base_experiment.json"
+    with open(config_path) as f:
+        config_data = json.load(f)
+    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
+    mocker.patch("json.load", return_value=config_data)
+    mocker.patch("shutil.copy")
     mock_dependencies["load_data"].return_value = []
-    dummy_input_path = "dummy/input.jsonl"
-    run.main(
-        input_filepath=dummy_input_path,
-        limit=None,
-        embedding_model_name="mock_model",
-        retriever_type="faiss",
-        top_k=5,
-    )
+
+    run.main(config_json=config_path)
 
     mock_dependencies["Runner"].assert_not_called()
     mock_dependencies["visualize"].assert_not_called()
-    mock_dependencies["load_data"].assert_called_once_with(dummy_input_path, limit=None)
+    mock_dependencies["load_data"].assert_called_once_with(
+        config_data["input_file"], limit=config_data["limit"]
+    )
 
 
-def test_run_main_unknown_retriever_type(mock_dependencies, capsys):
-    """Test that main() exits with error for unknown retriever_type."""
+def test_run_main_unknown_retriever_type(mock_dependencies, mocker, capsys):
     import sys
 
-    dummy_input_path = "dummy/input.jsonl"
+    config_path = "configs/base_experiment.json"
+    with open(config_path) as f:
+        config_data = json.load(f)
+    config_data_invalid = dict(config_data)
+    config_data_invalid["retriever_type"] = "invalid_type"
+    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data_invalid)))
+    mocker.patch("json.load", return_value=config_data_invalid)
+    mocker.patch("shutil.copy")
     original_exit = sys.exit
     sys.exit = lambda code=1: (_ for _ in ()).throw(SystemExit(code))
     try:
         with pytest.raises(SystemExit) as excinfo:
-            run.main(
-                input_filepath=dummy_input_path,
-                limit=None,
-                embedding_model_name="mock_model",
-                retriever_type="unknown",
-                top_k=5,
-            )
+            run.main(config_json=config_path)
         assert excinfo.value.code == 1
         captured = capsys.readouterr()
         assert "Error: Unknown retriever type" in captured.out
     finally:
         sys.exit = original_exit
+
+
+def test_config_is_copied_to_results(mock_dependencies, mocker):
+    config_path = "configs/base_experiment.json"
+    with open(config_path) as f:
+        config_data = json.load(f)
+    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
+    mocker.patch("json.load", return_value=config_data)
+    mock_copy = mocker.patch("shutil.copy")
+    mocker.patch("os.path.join", side_effect=os.path.join)
+
+    run.main(config_json=config_path)
+
+    # Check that the config file is copied to the results directory
+    output_dir = mock_dependencies["create_dir"].return_value[0]
+    expected_dest = os.path.join(output_dir, "experiment_config.json")
+    mock_copy.assert_called_once_with(config_path, expected_dest)

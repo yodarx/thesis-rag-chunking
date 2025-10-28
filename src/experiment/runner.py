@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-import evaluation.evaluation
+from src.evaluation import evaluation
 from src.vectorizer.vectorizer import Vectorizer
 
 from .results import ResultsHandler
@@ -65,7 +65,7 @@ class ExperimentRunner:
         chunk_embeddings = np.array(chunk_embeddings_list, dtype="float32")
         indices = self.retriever.search(data_point["question"], chunk_embeddings, self.top_k)
 
-        metrics = evaluation.evaluation.calculate_metrics(
+        metrics = evaluation.calculate_metrics(
             retrieved_chunks=[chunks[i] for i in indices],
             gold_passages=data_point["gold_passages"],
             k=self.top_k,

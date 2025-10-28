@@ -1,12 +1,15 @@
 import argparse
+import json
 import os
+import shutil
 import sys
 from datetime import datetime
 
+from src.chunking.chunk_fixed import chunk_fixed_size
+from src.chunking.chunk_recursive import chunk_recursive
+from src.chunking.chunk_semantic import chunk_semantic
+from src.chunking.chunk_sentence import chunk_by_sentence
 from src.experiment.data_loader import load_asqa_dataset
-from src.experiment.experiment import (
-    get_experiments,
-)
 from src.experiment.results import ResultsHandler
 from src.experiment.retriever import FaissRetriever
 from src.experiment.runner import ExperimentRunner
@@ -24,17 +27,52 @@ def _create_output_directory() -> (str, str):
     return output_dir, timestamp
 
 
+def load_config_and_experiments(json_path):
+    with open(json_path) as f:
+        config = json.load(f)
+    # Map function names to actual functions
+    chunk_functions = {
+        "chunk_fixed_size": chunk_fixed_size,
+        "chunk_by_sentence": chunk_by_sentence,
+        "chunk_recursive": chunk_recursive,
+        "chunk_semantic": chunk_semantic,
+    }
+    experiments = []
+    for exp in config["experiments"]:
+        func = chunk_functions[exp["function"]]
+        experiments.append(
+            {
+                "name": exp["name"],
+                "function": func,
+                "params": exp["params"],
+            }
+        )
+    return experiments, config
+
+
 def main(
-    input_filepath: str,
-    limit: int | None,
-    embedding_model_name: str,
-    retriever_type: str,
-    top_k: int,
+    input_filepath: str = None,
+    limit: int | None = None,
+    embedding_model_name: str = None,
+    retriever_type: str = None,
+    top_k: int = None,
+    config_json: str = None,
 ):
     output_dir, timestamp = _create_output_directory()
-    experiments = get_experiments()
+    if not config_json:
+        print("Error: --config-json is required. Please provide a config file.")
+        sys.exit(1)
+    # Copy config file to results directory
+    config_copy_path = os.path.join(output_dir, "experiment_config.json")
+    shutil.copy(config_json, config_copy_path)
+    experiments, config = load_config_and_experiments(config_json)
+    input_filepath = config["input_file"]
+    limit = config.get("limit")
+    embedding_model_name = config["embedding_model"]
+    retriever_type = config["retriever_type"]
+    top_k = config["top_k"]
 
-    dataset = load_asqa_dataset(input_filepath, limit=None)
+    dataset = load_asqa_dataset(input_filepath, limit=limit)
     if not dataset:
         print("Dataset could not be loaded. Exiting.")
         return
@@ -74,7 +112,7 @@ if __name__ == "__main__":
         "-i",
         "--input",
         type=str,
-        required=True,
+        required=False,
         help="Path to the preprocessed input JSONL file (e.g., data/processed/preprocessed_....jsonl).",
     )
     parser.add_argument(
@@ -103,12 +141,20 @@ if __name__ == "__main__":
         default=5,
         help="Number of top results to retrieve (retriever's K).",
     )
+    parser.add_argument(
+        "--config-json",
+        type=str,
+        required=False,
+        help="Path to the experiment config JSON file (default: configs/base_experiment.json)",
+    )
     args = parser.parse_args()
 
+    config_json_path = args.config_json or "configs/base_experiment.json"
     main(
         input_filepath=args.input,
         limit=args.limit,
         embedding_model_name=args.embedding_model,
         retriever_type=args.retriever_type,
         top_k=args.top_k,
+        config_json=config_json_path,
     )
