@@ -41,6 +41,8 @@ thesis-rag-chunking/
 │   ├── evaluation/       \<-- Retrieval metrics calculation
 │   └── plotting/         \<-- Visualization (matplotlib/seaborn)
 ├── results/              \<-- Output CSVs and plots
+├── configs/              # Experiment configuration files (JSON)
+│   └── base_experiment.json  # Default experiment config
 └── tests/                \<-- Pytest unit and integration tests
 
 ````
@@ -60,7 +62,7 @@ thesis-rag-chunking/
 2.  **Create and Activate a Virtual Environment:**
     ```bash
     # Create venv
-    python3 -m venv venv
+    python3.12 -m venv venv
     
     # Activate venv (macOS/Linux)
     source venv/bin/activate
@@ -84,36 +86,101 @@ thesis-rag-chunking/
 
 ## ⚙️ How to Run the Experiments
 
-The workflow is a two-step process. All commands **must be run from the project's root directory** (`thesis-rag-chunking/`) for the imports to work correctly.
+All experiment settings (chunking strategies, model, retriever, etc.) are now managed via a config file, typically `configs/base_experiment.json`.
 
-### Step 1: Run the Preprocessor
-
-First, you must download and process the ASQA dataset. This script runs as a standalone module.
-
+**To run the main experiment:**
 ```bash
-# This will fetch Wikipedia data and create the .jsonl file in data/processed/
-python -m src.preprocessor.preprocessor
-````
-
-*Note: This script has a `PREPROCESS_LIMIT` variable at the top, which is useful for quick testing. Set it to `None` to process the entire dataset.*
-
-### Step 2: Run the Main Experiment
-
-After the preprocessor has finished, you can run the main experiment pipeline. This will load the `.jsonl` file, run all chunking experiments, calculate metrics, and save the results.
-
-```bash
-python run.py
+python run.py --config-json configs/base_experiment.json
 ```
+- You can specify a different config file with `--config-json path/to/your_config.json`.
+- The config file used for the run will be copied into the results directory as `experiment_config.json` for reproducibility.
 
------
+**Customizing experiments:**
+- Edit `configs/base_experiment.json` to change chunking strategies, model, retriever, or dataset parameters.
+- You can create multiple config files in the `configs/` directory for different experiment setups.
+
+---
+
+## 🧩 Experiment Configuration
+
+All experiments are defined in JSON config files located in the `configs/` folder. The default config is `configs/base_experiment.json`.
+
+**Config file structure:**
+```json
+{
+  "embedding_model": "all-MiniLM-L6-v2",
+  "retriever_type": "faiss",
+  "top_k": 5,
+  "limit": 100,
+  "input_file": "data/preprocessed/preprocessed_2025-10-23_limit_5.jsonl",
+  "experiments": [
+    {
+      "name": "fixed_512_50",
+      "function": "chunk_fixed_size",
+      "params": {"chunk_size": 512, "chunk_overlap": 50}
+    },
+    {
+      "name": "sentence_s3",
+      "function": "chunk_by_sentence",
+      "params": {"sentences_per_chunk": 3}
+    },
+    {
+      "name": "semantic_t0.7",
+      "function": "chunk_semantic",
+      "params": {"similarity_threshold": 0.7}
+    }
+    // ... more experiments ...
+  ]
+}
+```
+- `embedding_model`: Name of the embedding model (e.g., from sentence-transformers)
+- `retriever_type`: Retrieval backend (currently only `faiss`)
+- `top_k`: Number of top results to retrieve
+- `limit`: Limit the number of dataset entries (for quick tests)
+- `input_file`: Path to the preprocessed ASQA dataset
+- `experiments`: List of chunking strategies to evaluate
+
+Each experiment must specify:
+- `name`: A unique name for the experiment
+- `function`: The chunking function (must match one of the available functions)
+- `params`: Parameters for the chunking function
+
+You can create additional config files in `configs/` for different experiment setups.
+
+---
+
+## ⚙️ Workflow Summary
+
+1. **Preprocess the dataset:**
+   ```bash
+   python -m src.preprocessor.preprocessor
+   ```
+   This creates the input file referenced in your config (e.g., `data/preprocessed/preprocessed_2025-10-23_limit_5.jsonl`).
+
+2. **Edit your experiment config:**
+   - Open `configs/base_experiment.json` (or create a new config in `configs/`).
+   - Adjust chunking strategies, parameters, or dataset path as needed.
+
+3. **Run the experiment:**
+   ```bash
+   python run.py --config-json configs/base_experiment.json
+   ```
+   - The config file will be copied into the results folder for reproducibility.
+   - All outputs (results, plots, config) are saved in a timestamped subfolder in `results/`.
+
+4. **View results:**
+   - Check the results folder for CSVs, plots, and the config used for the run.
+
+---
 
 ## 📊 Viewing Results
 
 All outputs from `run.py` are saved in a timestamped folder inside the `results/` directory (e.g., `results/2025-10-23_13-30-00/`).
 
-  * `_detailed_results.csv`: A CSV file with the metrics for **every single data point** and experiment.
-  * `_summary_results.csv`: A CSV file with the **aggregated (mean) results** for each experiment strategy.
-  * `*.png`: All generated plots (bar charts and scatter plots) for easy analysis.
+  * `experiment_config.json`: The exact config used for this run.
+  * `_detailed_results.csv`: Metrics for every data point and experiment.
+  * `_summary_results.csv`: Aggregated results for each strategy.
+  * `*.png`: All generated plots.
 
 The aggregated results are also printed directly to the console at the end of the run.
 
