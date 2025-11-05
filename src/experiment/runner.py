@@ -65,11 +65,13 @@ class ExperimentRunner:
         chunk_embeddings = np.array(chunk_embeddings_list, dtype="float32")
         indices = self.retriever.search(data_point["question"], chunk_embeddings, self.top_k)
 
+        log_matches = experiment.get("log_matches", False)
         metrics = evaluation.calculate_metrics(
             retrieved_chunks=[chunks[i] for i in indices],
             gold_passages=data_point["gold_passages"],
             k=self.top_k,
             question=data_point["question"],
+            log_matches=log_matches,
         )
 
         self.results_handler.add_result_record(

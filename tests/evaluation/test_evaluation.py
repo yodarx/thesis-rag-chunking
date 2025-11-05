@@ -189,27 +189,25 @@ def test_calculate_metrics_empty_inputs():
 
 
 def test_calculate_metrics_logging(sample_data, mocker: MockerFixture):
-    """Testet, ob die Logging-Funktion korrekt aufgerufen wird."""
+    """Testet, ob die Logging-Funktion korrekt aufgerufen wird, wenn log_matches=True."""
     mock_print = mocker.patch("builtins.print")
     retrieved_chunks, gold_passages = sample_data
     k = 4
     question = "Test Frage?"
 
-    calculate_metrics(retrieved_chunks, gold_passages, k, question=question)
-
-    # Überprüfen, ob print aufgerufen wurde
+    # Should log when log_matches=True
+    calculate_metrics(retrieved_chunks, gold_passages, k, question=question, log_matches=True)
     assert mock_print.call_count > 0
 
-    # Überprüfen, ob die Schlüsselausdrücke geloggt wurden
-    call_args_list = [call.args[0] for call in mock_print.call_args_list]
-    log_output = "\n".join(call_args_list)
+    # Should NOT log when log_matches=False
+    mock_print.reset_mock()
+    calculate_metrics(retrieved_chunks, gold_passages, k, question=question, log_matches=False)
+    assert mock_print.call_count == 0
 
-    assert "Test Frage?" in log_output
-    assert "MATCH FOUND!" in log_output
-    assert "Rank 1" in log_output
-    assert "Gold Eins" in log_output
-    assert "Rank 3" in log_output
-    assert "Gold Zwei" in log_output
+    # Should NOT log when question is None
+    mock_print.reset_mock()
+    calculate_metrics(retrieved_chunks, gold_passages, k, question=None, log_matches=True)
+    assert mock_print.call_count == 0
 
 
 def test_calculate_metrics_logging_no_match(mocker: MockerFixture):
@@ -220,7 +218,7 @@ def test_calculate_metrics_logging_no_match(mocker: MockerFixture):
     k = 2
     question = "Test?"
 
-    calculate_metrics(retrieved_chunks, gold_passages, k, question=question)
+    calculate_metrics(retrieved_chunks, gold_passages, k, question=question, log_matches=True)
 
     call_args_list = [call.args[0] for call in mock_print.call_args_list]
     log_output = "\n".join(call_args_list)

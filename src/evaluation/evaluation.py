@@ -16,7 +16,11 @@ class MatchResult(NamedTuple):
 
 
 def calculate_metrics(
-    retrieved_chunks: list[str], gold_passages: list[str], k: int, question: str | None = None
+    retrieved_chunks: list[str],
+    gold_passages: list[str],
+    k: int,
+    question: str | None = None,
+    log_matches: bool = False,
 ) -> dict[str, float]:
     """
     Berechnet Retrieval-Metriken (MRR, MAP, NDCG@k, P@k, R@k, F1@k)
@@ -36,7 +40,7 @@ def calculate_metrics(
     chunks_at_k = retrieved_chunks[:k]
     match_results = _get_match_results(chunks_at_k, gold_passages)
 
-    if question is not None:
+    if question is not None and log_matches:
         _log_matches(question, chunks_at_k, match_results)
 
     relevance_scores = [1 if res.is_relevant else 0 for res in match_results]
@@ -57,8 +61,6 @@ def calculate_metrics(
 
 
 # --- Metrik-Berechnungs-Helfer ---
-
-
 def calculate_mrr(relevance_scores: list[int]) -> float:
     """Berechnet den Mean Reciprocal Rank für eine einzelne Abfrage."""
     for i, score in enumerate(relevance_scores):
