@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from sentence_transformers import SentenceTransformer
 
 
@@ -14,9 +15,11 @@ class Vectorizer:
     def from_model_name(cls, model_name: str = "all-MiniLM-L6-v2") -> "Vectorizer":
         """
         Erstellt eine neue Vectorizer-Instanz durch Laden eines Modells
-        anhand seines Namens.
+        anhand seines Namens. Wählt automatisch GPU, falls verfügbar, sonst CPU.
         """
-        loaded_model = SentenceTransformer(model_name)
+        device = "cuda" if torch.cuda.is_available() else None
+        print("--- Vectorizer Gerät: ", device)
+        loaded_model = SentenceTransformer(model_name, device=device)
         return cls(loaded_model)
 
     def embed_documents(self, documents: list[str]) -> list[list[float]]:

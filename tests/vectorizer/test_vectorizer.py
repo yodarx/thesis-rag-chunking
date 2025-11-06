@@ -83,3 +83,30 @@ def test_from_model_name_factory_method(mocker: MockerFixture):
 
     # 2. Überprüfe, ob die erstellte Instanz im Vectorizer gespeichert wurde
     assert vectorizer.model is mock_model_instance
+
+
+def test_from_model_name_factory_method_gpu_selection(mocker: MockerFixture):
+    """
+    Tests the '.from_model_name' factory method to ensure it selects GPU if available,
+    otherwise CPU, and passes the correct device to SentenceTransformer.
+    """
+    model_name = "test-model-name"
+    mock_model_instance = mocker.Mock(spec=SentenceTransformer)
+    mock_constructor = mocker.patch(
+        "vectorizer.vectorizer.SentenceTransformer",
+        return_value=mock_model_instance,
+    )
+
+    # Case 1: GPU available
+    mocker.patch("torch.cuda.is_available", return_value=True)
+    vectorizer_gpu = Vectorizer.from_model_name(model_name)
+    mock_constructor.assert_called_with(model_name, device="cuda")
+    assert vectorizer_gpu.model is mock_model_instance
+
+    mock_constructor.reset_mock()
+
+    # Case 2: GPU not available
+    mocker.patch("torch.cuda.is_available", return_value=False)
+    vectorizer_cpu = Vectorizer.from_model_name(model_name)
+    mock_constructor.assert_called_with(model_name, device=None)
+    assert vectorizer_cpu.model is mock_model_instance
