@@ -106,7 +106,7 @@ def main(
         print("No summary DataFrame to visualize.")
 
 
-if __name__ == "__main__":
+def cli_entry():
     parser = argparse.ArgumentParser(description="Run RAG chunking experiments.")
     parser.add_argument(
         "-i",
@@ -147,14 +147,34 @@ if __name__ == "__main__":
         required=False,
         help="Path to the experiment config JSON file (default: configs/base_experiment.json)",
     )
+    parser.add_argument(
+        "--run-all-configs",
+        action="store_true",
+        help="Run all experiment configs in the configs/ folder sequentially.",
+    )
     args = parser.parse_args()
 
-    config_json_path = args.config_json or "configs/base_experiment.json"
-    main(
-        input_filepath=args.input,
-        limit=args.limit,
-        embedding_model_name=args.embedding_model,
-        retriever_type=args.retriever_type,
-        top_k=args.top_k,
-        config_json=config_json_path,
-    )
+    if args.run_all_configs:
+        config_dir = os.path.join(os.path.dirname(__file__), "configs")
+        config_files = sorted(
+            [os.path.join(config_dir, f) for f in os.listdir(config_dir) if f.endswith(".json")]
+        )
+        if not config_files:
+            print("No config files found in configs/ directory.")
+            sys.exit(1)
+        for config_path in config_files:
+            print(f"\nRunning experiment for config: {os.path.basename(config_path)}")
+            try:
+                main(config_json=config_path)
+            except Exception as e:
+                print(
+                    f"Experiment failed for {os.path.basename(config_path)}: {e}", file=sys.stderr
+                )
+    elif args.config_json:
+        main(config_json=args.config_json)
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    cli_entry()

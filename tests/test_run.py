@@ -126,3 +126,32 @@ def test_config_is_copied_to_results(mock_dependencies, mocker):
     output_dir = mock_dependencies["create_dir"].return_value[0]
     expected_dest = os.path.join(output_dir, "experiment_config.json")
     mock_copy.assert_called_once_with(config_path, expected_dest)
+
+
+def test_run_all_configs_sequential(mocker, mock_dependencies):
+    config_files = [
+        "1_full_parameter_sweep.json",
+        "2_model_sensitivity_bge_large.json",
+        "3_top_k_sensitivity_k1.json",
+    ]
+    config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "configs")
+    mocker.patch("os.listdir", return_value=config_files)
+    mocker.patch("os.path.dirname", return_value=os.path.dirname(os.path.dirname(__file__)))
+
+    # Simulate CLI args
+    import sys
+
+    sys.argv = ["run.py", "--run-all-configs"]
+    import importlib
+
+    importlib.reload(run)
+    mock_main = mocker.patch("run.main")
+    run.cli_entry()
+    expected_calls = [
+        mocker.call(config_json=os.path.join(config_dir, f)) for f in sorted(config_files)
+    ]
+    actual_calls = [call for call in mock_main.call_args_list]
+    for expected, actual in zip(expected_calls, actual_calls, strict=True):
+        if expected != actual:
+            assert actual.args[0] == expected.kwargs["config_json"]
+    assert mock_main.call_count == len(config_files)

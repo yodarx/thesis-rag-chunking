@@ -74,12 +74,13 @@ def test_from_model_name_factory_method(mocker: MockerFixture):
         "vectorizer.vectorizer.SentenceTransformer",  # Pfad zur Klasse in *deiner* Datei
         return_value=mock_model_instance,
     )
+    mocker.patch("torch.cuda.is_available", return_value=True)
 
     # Rufe die Factory-Methode auf
     vectorizer = Vectorizer.from_model_name(model_name)
 
     # 1. Überprüfe, ob der Konstruktor mit dem Namen aufgerufen wurde
-    mock_constructor.assert_called_once_with(model_name)
+    mock_constructor.assert_called_once_with(model_name, device="cuda")
 
     # 2. Überprüfe, ob die erstellte Instanz im Vectorizer gespeichert wurde
     assert vectorizer.model is mock_model_instance
