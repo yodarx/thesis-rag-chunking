@@ -47,7 +47,7 @@ def mock_dependencies(mocker: MockerFixture):
 
 
 def test_run_main_workflow(mock_dependencies, mocker):
-    config_path = "configs/base_experiment_limit_5.json"
+    config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
@@ -71,7 +71,7 @@ def test_run_main_workflow(mock_dependencies, mocker):
 
 
 def test_run_main_no_data(mock_dependencies, mocker):
-    config_path = "configs/base_experiment_limit_5.json"
+    config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
@@ -91,7 +91,7 @@ def test_run_main_no_data(mock_dependencies, mocker):
 def test_run_main_unknown_retriever_type(mock_dependencies, mocker, capsys):
     import sys
 
-    config_path = "configs/base_experiment_limit_5.json"
+    config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
     config_data_invalid = dict(config_data)
@@ -112,7 +112,7 @@ def test_run_main_unknown_retriever_type(mock_dependencies, mocker, capsys):
 
 
 def test_config_is_copied_to_results(mock_dependencies, mocker):
-    config_path = "configs/base_experiment_limit_5.json"
+    config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))

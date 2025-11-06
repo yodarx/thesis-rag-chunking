@@ -37,7 +37,7 @@ thesis-rag-chunking/
 ├── run.py                \<-- Main experiment orchestrator
 ├── requirements.txt      \<-- Project dependencies
 ├── configs/              # Experiment configuration files (JSON)
-│   └── base_experiment_limit_5.json  # Default experiment config
+│   └── 0_base_experiment.json  # Default experiment config
 ├── data/
 │   └── preprocessed/        \<-- Output of the preprocessor (e.g., asqa\_preprocessed.jsonl)
 ├── results/              \<-- Output CSVs and plots
