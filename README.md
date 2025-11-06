@@ -61,7 +61,7 @@ thesis-rag-chunking/
 
 1. **Clone the Repository:**
    ```bash
-   git clone [https://your-repository-url.com/thesis-rag-chunking.git](https://your-repository-url.com/thesis-rag-chunking.git)
+   git clone https://git.ffhs.ch/jeremy.rhodes/thesis-rag-chunking.git
    cd thesis-rag-chunking
    ```
 
