@@ -21,7 +21,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 def _create_output_directory() -> (str, str):
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output_dir = os.path.join("results", timestamp)
+    # Use /workspace for persistent storage on RunPod.io
+    base_dir = "/workspace" if os.path.exists("/workspace") else "results"
+    output_dir = os.path.join(base_dir, "results", timestamp)
     os.makedirs(output_dir, exist_ok=True)
     print(f"Results for this run will be saved in '{output_dir}'.")
     return output_dir, timestamp

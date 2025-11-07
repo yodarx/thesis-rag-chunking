@@ -86,6 +86,7 @@ thesis-rag-chunking/
    The chunking strategies require the NLTK `punkt` tokenizer. Run this command once to download it:
    ```bash
    python -m nltk.downloader punkt
+   python -m nltk.downloader punkt_tab
    ```
 
 ---

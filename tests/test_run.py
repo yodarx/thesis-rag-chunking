@@ -111,7 +111,8 @@ def test_run_main_unknown_retriever_type(mock_dependencies, mocker, capsys):
         sys.exit = original_exit
 
 
-def test_config_is_copied_to_results(mock_dependencies, mocker):
+def test_config_is_copied_to_results_local_environment(mock_dependencies, mocker):
+    """Test config copying in local environment (no /workspace directory)."""
     config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
@@ -120,10 +121,38 @@ def test_config_is_copied_to_results(mock_dependencies, mocker):
     mock_copy = mocker.patch("shutil.copy")
     mocker.patch("os.path.join", side_effect=os.path.join)
 
+    # Mock os.path.exists to simulate local environment (no /workspace)
+    mock_exists = mocker.patch("os.path.exists")
+    mock_exists.return_value = False
+
     run.main(config_json=config_path)
 
-    # Check that the config file is copied to the results directory
-    output_dir = mock_dependencies["create_dir"].return_value[0]
+    # Check that the config file is copied to the correct results directory
+    output_dir = mock_dependencies["create_dir"].return_value[0]  # Use mock_dir directly
+    expected_dest = os.path.join(output_dir, "experiment_config.json")
+    mock_copy.assert_called_once_with(config_path, expected_dest)
+
+
+def test_config_is_copied_to_results_runpod_environment(mock_dependencies, mocker):
+    """Test config copying in RunPod environment (with /workspace directory)."""
+    config_path = "configs/0_base_experiment.json"
+    with open(config_path) as f:
+        config_data = json.load(f)
+    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
+    mocker.patch("json.load", return_value=config_data)
+    mock_copy = mocker.patch("shutil.copy")
+    mocker.patch("os.path.join", side_effect=os.path.join)
+
+    # Mock os.path.exists to simulate RunPod environment (with /workspace)
+    def exists_side_effect(path):
+        return path == "/workspace"
+
+    mock_exists = mocker.patch("os.path.exists", side_effect=exists_side_effect)
+
+    run.main(config_json=config_path)
+
+    # Check that the config file is copied to the correct results directory
+    output_dir = mock_dependencies["create_dir"].return_value[0]  # Use mock_dir directly
     expected_dest = os.path.join(output_dir, "experiment_config.json")
     mock_copy.assert_called_once_with(config_path, expected_dest)
 
