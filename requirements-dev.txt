@@ -1,0 +1,8 @@
+task
+pytest
+pytest-mock
+jupyter
+ipython
+black
+flake8
+mypy

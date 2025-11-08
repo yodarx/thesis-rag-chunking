@@ -157,25 +157,95 @@ def cli_entry():
     args = parser.parse_args()
 
     if args.run_all_configs:
+        # Create ONE shared output directory for all configs
+        output_dir, timestamp = _create_output_directory()
         config_dir = os.path.join(os.path.dirname(__file__), "configs")
         config_files = sorted(
             [os.path.join(config_dir, f) for f in os.listdir(config_dir) if f.endswith(".json")]
         )
+
+        print(
+            f"Found {len(config_files)} config files: {[os.path.basename(f) for f in config_files]}"
+        )
+
         if not config_files:
             print("No config files found in configs/ directory.")
             sys.exit(1)
+
         for config_path in config_files:
             print(f"\nRunning experiment for config: {os.path.basename(config_path)}")
             try:
-                main(config_json=config_path)
+                main_with_shared_output(
+                    config_json=config_path, output_dir=output_dir, timestamp=timestamp
+                )
+                print(f"Experiment completed for {os.path.basename(config_path)}")
             except Exception as e:
                 print(
                     f"Experiment failed for {os.path.basename(config_path)}: {e}", file=sys.stderr
                 )
+
+        print("All experiments completed successfully!")
+        sys.exit(0)
     elif args.config_json:
         main(config_json=args.config_json)
+        print("Experiment completed successfully!")
+        sys.exit(0)
     else:
         parser.print_help()
+        sys.exit(0)
+
+
+def main_with_shared_output(config_json: str, output_dir: str, timestamp: str):
+    """Run experiment with pre-created output directory"""
+    if not config_json:
+        print("Error: --config-json is required. Please provide a config file.")
+        sys.exit(1)
+
+    # Copy config file to results directory
+    config_copy_path = os.path.join(
+        output_dir, f"experiment_config_{os.path.basename(config_json)}"
+    )
+    shutil.copy(config_json, config_copy_path)
+
+    experiments, config = load_config_and_experiments(config_json)
+    input_filepath = config["input_file"]
+    limit = config.get("limit")
+    embedding_model_name = config["embedding_model"]
+    retriever_type = config["retriever_type"]
+    top_k = config["top_k"]
+
+    dataset = load_asqa_dataset(input_filepath, limit=limit)
+    if not dataset:
+        print("Dataset could not be loaded. Exiting.")
+        return
+
+    print(f"Initializing Vectorizer with {embedding_model_name}...")
+    vectorizer = Vectorizer.from_model_name(model_name=embedding_model_name)
+
+    if retriever_type == "faiss":
+        print(f"Using FAISS Retriever with top_k={top_k}.")
+        retriever = FaissRetriever(vectorizer)
+    else:
+        print(f"Error: Unknown retriever type '{retriever_type}'. Only 'faiss' is supported.")
+        sys.exit(1)
+
+    results_handler = ResultsHandler(output_dir, timestamp)
+
+    runner = ExperimentRunner(
+        experiments=experiments,
+        dataset=dataset,
+        vectorizer=vectorizer,
+        retriever=retriever,
+        results_handler=results_handler,
+        top_k=top_k,
+    )
+
+    summary_df = runner.run_all()
+
+    if not summary_df.empty:
+        visualize_and_save_results(summary_df, output_dir, timestamp)
+    else:
+        print("No summary DataFrame to visualize.")
 
 
 if __name__ == "__main__":

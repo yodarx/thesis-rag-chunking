@@ -1,0 +1,16 @@
+.git
+.gitignore
+README.md
+.pytest_cache
+__pycache__
+*.pyc
+tests/
+notebooks/
+results/
+venv/
+.venv/
+*.log
+.DS_Store
+.idea/
+*.egg-info/
+

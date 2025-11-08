@@ -1,4 +1,4 @@
-from langchain.text_splitter import CharacterTextSplitter
+from langchain_text_splitters import CharacterTextSplitter
 
 
 def chunk_fixed_size(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
