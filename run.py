@@ -79,7 +79,7 @@ def main(
         print("Dataset could not be loaded. Exiting.")
         return
 
-    print(f"Initializing Vectorizer with {embedding_model_name}...")
+    print(f"Initializing Retrieval Vectorizer with {embedding_model_name}...")
     vectorizer = Vectorizer.from_model_name(model_name=embedding_model_name)
 
     if retriever_type == "faiss":
@@ -91,6 +91,7 @@ def main(
 
     results_handler = ResultsHandler(output_dir, timestamp)
 
+    # ExperimentRunner will load chunking models as needed from experiment params
     runner = ExperimentRunner(
         experiments=experiments,
         dataset=dataset,
@@ -219,7 +220,7 @@ def main_with_shared_output(config_json: str, output_dir: str, timestamp: str):
         print("Dataset could not be loaded. Exiting.")
         return
 
-    print(f"Initializing Vectorizer with {embedding_model_name}...")
+    print(f"Initializing Retrieval Vectorizer with {embedding_model_name}...")
     vectorizer = Vectorizer.from_model_name(model_name=embedding_model_name)
 
     if retriever_type == "faiss":
@@ -231,6 +232,7 @@ def main_with_shared_output(config_json: str, output_dir: str, timestamp: str):
 
     results_handler = ResultsHandler(output_dir, timestamp)
 
+    # ExperimentRunner will load chunking models as needed from experiment params
     runner = ExperimentRunner(
         experiments=experiments,
         dataset=dataset,

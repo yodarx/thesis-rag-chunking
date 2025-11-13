@@ -36,15 +36,20 @@
       "params": {"chunk_size": 256, "chunk_overlap": 25}
     },
     {
-      "name": "semantic_t0.7",
+      "name": "semantic_t0.7_miniLM",
       "function": "chunk_semantic",
-      "params": {"similarity_threshold": 0.7}
+      "params": {
+        "similarity_threshold": 0.7,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
     },
     {
-      "name": "semantic_t0.85",
+      "name": "semantic_t0.85_miniLM",
       "function": "chunk_semantic",
-      "params": {"similarity_threshold": 0.85}
+      "params": {
+        "similarity_threshold": 0.85,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
     }
   ]
 }
-

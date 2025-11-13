@@ -18,7 +18,7 @@ RUN curl -o runpodctl https://github.com/runpod/runpodctl/releases/latest/downlo
     && mv runpodctl /usr/local/bin/
 
 # Copy requirements for faster Docker builds
-COPY requirements.txt .
+COPY ../requirements.txt .
 
 # Upgrade pip and install all Python packages from requirements.txt
 RUN pip install --upgrade pip \
@@ -30,11 +30,11 @@ RUN pip install --upgrade pip \
     && find /usr/local/lib/python3.12/site-packages -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # Copy source code and configs
-COPY src/ ./src/
-COPY configs/ ./configs/
-COPY data/ ./data/
-COPY run.py .
-COPY run_and_stop.sh .
+COPY ../src/ ./src/
+COPY ../configs/ ./configs/
+COPY ../data/ ./data/
+COPY ../run.py .
+COPY ./docker/run_and_stop.sh .
 
 # Set Python path
 ENV PYTHONPATH=/app

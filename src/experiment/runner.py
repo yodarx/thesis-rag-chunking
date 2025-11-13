@@ -22,20 +22,44 @@ class ExperimentRunner:
         retriever: FaissRetriever,
         results_handler: ResultsHandler,
         top_k: int,
+        chunking_vectorizer: Vectorizer | None = None,
     ):
         self.experiments = experiments
         self.dataset = dataset
         self.vectorizer = vectorizer
         self.retriever = retriever
         self.results_handler = results_handler
-        # self.cacher = cacher (entfernt)
         self.top_k = top_k
+        # Default chunking vectorizer (can be overridden per experiment)
+        self.default_chunking_vectorizer = (
+            chunking_vectorizer if chunking_vectorizer is not None else vectorizer
+        )
+        # Cache for loaded chunking models to avoid reloading
+        self._chunking_model_cache: dict[str, Vectorizer] = {}
+
+    def _get_chunking_vectorizer(self, model_name: str) -> Vectorizer:
+        """Load or retrieve cached chunking vectorizer for a given model name."""
+        if model_name not in self._chunking_model_cache:
+            print(f"Loading chunking model: {model_name}")
+            self._chunking_model_cache[model_name] = Vectorizer.from_model_name(model_name)
+        return self._chunking_model_cache[model_name]
 
     def _prepare_chunk_parameters(self, experiment: dict[str, Any]) -> dict[str, Any]:
         chunk_params = experiment["params"].copy()
 
         if experiment["function"].__name__ == "chunk_semantic":
-            chunk_params["vectorizer"] = self.vectorizer
+            # Check if chunking_embeddings is specified in the experiment params
+            if "chunking_embeddings" in chunk_params:
+                model_name = chunk_params["chunking_embeddings"]
+
+                # If it's a string, load the model
+                if isinstance(model_name, str):
+                    chunk_params["chunking_embeddings"] = self._get_chunking_vectorizer(model_name)
+                # Otherwise, it's already a Vectorizer instance (from tests)
+            else:
+                # Use default chunking vectorizer if not specified
+                chunk_params["chunking_embeddings"] = self.default_chunking_vectorizer
+
         return chunk_params
 
     def _execute_chunking(

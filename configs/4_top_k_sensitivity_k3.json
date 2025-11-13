@@ -11,7 +11,21 @@
     { "name": "sentence_s5", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 5} },
     { "name": "recursive_512_50", "function": "chunk_recursive", "params": {"chunk_size": 512, "chunk_overlap": 50} },
     { "name": "recursive_256_25", "function": "chunk_recursive", "params": {"chunk_size": 256, "chunk_overlap": 25} },
-    { "name": "semantic_t0.7", "function": "chunk_semantic", "params": {"similarity_threshold": 0.7} },
-    { "name": "semantic_t0.85", "function": "chunk_semantic", "params": {"similarity_threshold": 0.85} }
+    {
+      "name": "semantic_t0.7_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.7,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.85_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.85,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    }
   ]
 }

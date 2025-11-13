@@ -5,7 +5,7 @@ TAG="${1:-latest}"
 DOCKERHUB_USERNAME="jsstudentsffhs"
 
 echo "🐳 Building Docker container..."
-docker build -t $IMAGE_NAME:$TAG .
+docker build -f docker/Dockerfile -t $IMAGE_NAME:$TAG .
 
 if [ $? -ne 0 ]; then
     echo "❌ Docker build failed!"

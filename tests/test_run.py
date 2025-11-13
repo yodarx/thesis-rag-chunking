@@ -60,7 +60,12 @@ def test_run_main_workflow(mock_dependencies, mocker):
     mock_dependencies["load_data"].assert_called_once_with(
         config_data["input_file"], limit=config_data["limit"]
     )
-    mock_dependencies["Vector"].from_model_name.assert_called_once()
+    # Now expects only ONE call for the retrieval model
+    # Chunking models are loaded on-demand by ExperimentRunner
+    mock_dependencies["Vector"].from_model_name.assert_called_once_with(
+        model_name=config_data["embedding_model"]
+    )
+
     mock_dependencies["Retriever"].assert_called_once()
     mock_dependencies["Results"].assert_called_once_with("mock_dir", "mock_ts")
     mock_dependencies["Runner"].assert_called_once()
@@ -167,20 +172,33 @@ def test_run_all_configs_sequential(mocker, mock_dependencies):
     mocker.patch("os.listdir", return_value=config_files)
     mocker.patch("os.path.dirname", return_value=os.path.dirname(os.path.dirname(__file__)))
 
+    # Mock main_with_shared_output instead of main
+    mock_main_shared = mocker.patch("run.main_with_shared_output")
+
     # Simulate CLI args
     import sys
 
-    sys.argv = ["run.py", "--run-all-configs"]
-    import importlib
+    original_argv = sys.argv
+    original_exit = sys.exit
 
-    importlib.reload(run)
-    mock_main = mocker.patch("run.main")
-    run.cli_entry()
-    expected_calls = [
-        mocker.call(config_json=os.path.join(config_dir, f)) for f in sorted(config_files)
-    ]
-    actual_calls = [call for call in mock_main.call_args_list]
-    for expected, actual in zip(expected_calls, actual_calls, strict=True):
-        if expected != actual:
-            assert actual.args[0] == expected.kwargs["config_json"]
-    assert mock_main.call_count == len(config_files)
+    try:
+        sys.argv = ["run.py", "--run-all-configs"]
+
+        # Mock sys.exit to prevent actual exit
+        def mock_exit(code=0):
+            raise SystemExit(code)
+
+        sys.exit = mock_exit
+
+        with pytest.raises(SystemExit) as excinfo:
+            run.cli_entry()
+
+        # Should exit with 0 (success)
+        assert excinfo.value.code == 0
+
+        # Verify main_with_shared_output was called for each config
+        assert mock_main_shared.call_count == len(config_files)
+
+    finally:
+        sys.argv = original_argv
+        sys.exit = original_exit

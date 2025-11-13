@@ -27,10 +27,157 @@
     { "name": "sentence_s5", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 5} },
     { "name": "sentence_s7", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 7} },
     { "name": "sentence_s10", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 10} },
-    { "name": "semantic_t0.6", "function": "chunk_semantic", "params": {"similarity_threshold": 0.6} },
-    { "name": "semantic_t0.7", "function": "chunk_semantic", "params": {"similarity_threshold": 0.7} },
-    { "name": "semantic_t0.8", "function": "chunk_semantic", "params": {"similarity_threshold": 0.8} },
-    { "name": "semantic_t0.85", "function": "chunk_semantic", "params": {"similarity_threshold": 0.85} },
-    { "name": "semantic_t0.9", "function": "chunk_semantic", "params": {"similarity_threshold": 0.9} }
+    {
+      "name": "semantic_t0.5_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.5,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.6_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.6,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.7_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.7,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.75_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.75,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.8_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.8,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.85_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.85,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.9_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.9,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.95_miniLM",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.95,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.7_bge_base",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.7,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.75_bge_base",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.75,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.8_bge_base",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.8,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.85_bge_base",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.85,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.9_bge_base",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.9,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.7_bge_small",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.7,
+        "chunking_embeddings": "BAAI/bge-small-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.8_bge_small",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.8,
+        "chunking_embeddings": "BAAI/bge-small-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.85_bge_small",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.85,
+        "chunking_embeddings": "BAAI/bge-small-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.7_mpnet",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.7,
+        "chunking_embeddings": "sentence-transformers/all-mpnet-base-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.8_mpnet",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.8,
+        "chunking_embeddings": "sentence-transformers/all-mpnet-base-v2"
+      }
+    },
+    {
+      "name": "semantic_t0.85_mpnet",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.85,
+        "chunking_embeddings": "sentence-transformers/all-mpnet-base-v2"
+      }
+    }
   ]
 }

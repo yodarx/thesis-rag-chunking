@@ -4,13 +4,21 @@ lint = "ruff check ."
 format = "ruff format ."
 lint_format_write = "ruff check . --fix && ruff format ."
 start = "python main.py"
+docker_build_dev = "bash docker/build-and-upload.sh dev"
+docker_build_latest = "bash docker/build-and-upload.sh latest"
+docker_build = "bash docker/build-and-upload.sh"
 
 [tool.pytest.ini_options]
 pythonpath = [
     ".",
     "src"
 ]
-
+filterwarnings = [
+    "ignore::DeprecationWarning:importlib._bootstrap",
+    "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100

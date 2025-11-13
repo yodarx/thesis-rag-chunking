@@ -9,6 +9,7 @@ faiss-cpu
 # NLP and Text Processing
 langchain-core
 langchain-text-splitters
+langchain-experimental
 nltk
 
 # Web scraping and data loading

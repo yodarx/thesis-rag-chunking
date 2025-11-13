@@ -1,7 +1,8 @@
 # Thesis RAG Chunking Experiments
 
 This project explores different chunking strategies for Retrieval-Augmented Generation (RAG) systems as part of a thesis
-research.
+research. It provides a comprehensive framework for comparing fixed-size, recursive, sentence-based, and semantic
+chunking approaches with various embedding models and retrieval configurations.
 
 ## Project Structure
 
@@ -28,20 +29,37 @@ thesis-rag-chunking/
 │       └── main.py                   # Data preprocessing utilities
 ├── configs/
 │   ├── 0_base_experiment.json        # Base experiment configuration
-│   ├── 1_full_parameter_sweep.json   # Full parameter sweep
-│   └── 2_model_sensitivity_*.json    # Model sensitivity tests
+│   ├── 1_full_parameter_sweep.json   # Full parameter sweep (all chunking methods)
+│   ├── 2_model_sensitivity_bge_large.json  # Model sensitivity analysis
+│   ├── 3_top_k_sensitivity_k1.json   # Top-k retrieval with k=1
+│   ├── 4_top_k_sensitivity_k3.json   # Top-k retrieval with k=3
+│   └── 5_top_k_sensitivity_k10.json  # Top-k retrieval with k=10
 ├── data/
 │   └── preprocessed/                 # Preprocessed datasets (gitignored)
+├── docker/                           # Docker configuration and scripts
+│   ├── Dockerfile                    # Container definition
+│   ├── .dockerignore                 # Docker build exclusions
+│   ├── build-and-upload.sh          # Build and push script
+│   ├── run_and_stop.sh              # Container entrypoint script
+│   └── README.md                     # Docker documentation
 ├── results/                          # Experiment results (gitignored)
 ├── tests/                            # Unit tests
 ├── notebooks/                        # Jupyter notebooks for analysis
 ├── requirements.txt                  # Production dependencies
-├── requirements-dev.txt              # Development dependencies  
-├── Dockerfile                        # Docker container configuration
-├── build-and-upload.sh              # Docker build and upload script
-├── test-docker-locally.sh           # Local Docker testing script
+├── requirements-dev.txt              # Development dependencies
+├── run.py                            # Main experiment runner
 └── README.md
 ```
+
+## Key Features
+
+- 🔬 **Multiple Chunking Strategies**: Fixed, Recursive, Sentence-based, and Semantic chunking
+- 🧪 **Scientific Rigor**: Separate chunking and retrieval embeddings to avoid confounding variables
+- 📊 **Comprehensive Metrics**: MAP, MRR, NDCG, Precision, Recall, F1
+- 🚀 **Production Ready**: Docker support for RunPod and cloud deployment
+- 🔧 **Flexible Configuration**: JSON-based experiment definitions
+- 📈 **Automatic Visualization**: Results plotting and statistical analysis
+- ⚡ **Parallel Execution**: Run multiple experiments efficiently
 
 ## Requirements
 
@@ -88,16 +106,18 @@ python -m nltk.downloader punkt punkt_tab
 ### Production Setup (Docker)
 
 ```bash
-# Build and upload Docker container
-chmod +x build-and-upload.sh
-./build-and-upload.sh
+# Build and upload Docker container (from project root)
+bash docker/build-and-upload.sh
 ```
 
 ## Docker Setup
 
+See the [docker/README.md](docker/README.md) for complete Docker documentation.
+
 ### Building the Container
 
-The project includes a complete Docker setup for running experiments on cloud platforms like RunPod.
+The project includes a complete Docker setup for running experiments on cloud platforms like RunPod. All Docker-related
+files are organized in the `docker/` directory.
 
 **Key Docker Features:**
 
@@ -108,34 +128,24 @@ The project includes a complete Docker setup for running experiments on cloud pl
 - Automatic results directory creation
 - Proper Python path configuration
 
-**Build and Upload Script (`build-and-upload.sh`):**
+**Quick Start:**
 
 ```bash
-#!/bin/bash
-IMAGE_NAME="thesis-rag-chunking"
-TAG="latest"
-DOCKERHUB_USERNAME="your-dockerhub-username"  # Replace with your username
+# Build and upload to Docker Hub (run from project root)
+bash docker/build-and-upload.sh [TAG]
 
-# Build, tag, and upload to Docker Hub
-docker build -t $IMAGE_NAME:$TAG .
-docker tag $IMAGE_NAME:$TAG $DOCKERHUB_USERNAME/$IMAGE_NAME:$TAG
-docker login
-docker push $DOCKERHUB_USERNAME/$IMAGE_NAME:$TAG
+# Build locally without uploading
+bash docker/build-and-upload.sh dev
 ```
 
-**Local Testing Script (`test-docker-locally.sh`):**
-
-- Builds container locally
-- Provides interactive shell for manual testing
-- Runs default experiment to verify functionality
-- Creates local workspace directory for output
+For detailed Docker documentation, see [docker/README.md](docker/README.md).
 
 ### Using on RunPod
 
 After building and uploading, use this image in RunPod:
 
 ```
-your-dockerhub-username/thesis-rag-chunking:latest
+jsstudentsffhs/thesis-rag-chunking:latest
 ```
 
 The container automatically uses `/workspace` for persistent storage if available (RunPod), otherwise falls back to
@@ -181,17 +191,39 @@ ls /workspace/results/
 
 ### Configuration Files
 
-Experiments are defined in JSON files in the `configs/` directory:
+Experiments are defined in JSON files in the `configs/` directory. Each configuration specifies the embedding model,
+retrieval settings, and chunking experiments to run.
+
+**Available Configurations:**
+
+- **0_base_experiment.json** - Quick validation with core chunking methods
+- **1_full_parameter_sweep.json** - Comprehensive sweep of all parameters and methods
+- **2_model_sensitivity_bge_large.json** - Tests with different embedding models
+- **3_top_k_sensitivity_k1.json** - Retrieval analysis with top-1 results
+- **4_top_k_sensitivity_k3.json** - Retrieval analysis with top-3 results
+- **5_top_k_sensitivity_k10.json** - Retrieval analysis with top-10 results
+
+**Example Configuration:**
 
 ```json
 {
+  "embedding_model": "all-MiniLM-L6-v2",
+  "retriever_type": "faiss",
+  "top_k": 5,
+  "limit": 1,
+  "input_file": "data/preprocessed/preprocessed_2025-11-03_all.jsonl",
   "experiments": [
     {
-      "name": "fixed_512_128",
+      "name": "fixed_512_50",
       "function": "chunk_fixed_size",
+      "params": {"chunk_size": 512, "chunk_overlap": 50}
+    },
+    {
+      "name": "semantic_t0.8_miniLM",
+      "function": "chunk_semantic",
       "params": {
-        "chunk_size": 512,
-        "chunk_overlap": 128
+        "similarity_threshold": 0.8,
+        "chunking_embeddings": "all-MiniLM-L6-v2"
       }
     }
   ]
@@ -200,17 +232,135 @@ Experiments are defined in JSON files in the `configs/` directory:
 
 ### Available Chunking Strategies
 
-1. **Fixed Size** (`chunk_fixed_size`) - Fixed character length chunks
-2. **Recursive** (`chunk_recursive`) - Recursive character text splitting
-3. **Semantic** (`chunk_semantic`) - Similarity-based semantic chunking
-4. **Sentence** (`chunk_by_sentence`) - Sentence boundary-based chunking
+#### 1. Fixed Size (`chunk_fixed_size`)
+
+Creates chunks of fixed character length with optional overlap.
+
+**Parameters:**
+
+- `chunk_size`: Number of characters per chunk (e.g., 128, 256, 512, 1024)
+- `chunk_overlap`: Number of overlapping characters between chunks (e.g., 0, 50, 128)
+
+**Example:**
+
+```json
+{
+  "name": "fixed_512_50",
+  "function": "chunk_fixed_size",
+  "params": {
+    "chunk_size": 512,
+    "chunk_overlap": 50
+  }
+}
+```
+
+#### 2. Recursive Character Splitting (`chunk_recursive`)
+
+Uses LangChain's recursive character text splitter with intelligent break points.
+
+**Parameters:**
+
+- `chunk_size`: Target chunk size in characters
+- `chunk_overlap`: Overlap between chunks
+
+**Example:**
+
+```json
+{
+  "name": "recursive_512_50",
+  "function": "chunk_recursive",
+  "params": {
+    "chunk_size": 512,
+    "chunk_overlap": 50
+  }
+}
+```
+
+#### 3. Sentence-Based (`chunk_by_sentence`)
+
+Groups consecutive sentences into chunks.
+
+**Parameters:**
+
+- `sentences_per_chunk`: Number of sentences per chunk (e.g., 1, 3, 5, 10)
+
+**Example:**
+
+```json
+{
+  "name": "sentence_s5",
+  "function": "chunk_by_sentence",
+  "params": {
+    "sentences_per_chunk": 5
+  }
+}
+```
+
+#### 4. Semantic Chunking (`chunk_semantic`)
+
+**New and Improved!** Creates chunks based on semantic similarity between sentences using LangChain's SemanticChunker
+with percentile-based breakpoint detection.
+
+**Parameters:**
+
+- `similarity_threshold`: Threshold for semantic similarity (0.0-1.0)
+  - Higher values (0.8-0.95) create fewer, larger chunks
+  - Lower values (0.5-0.7) create more, smaller chunks
+- `chunking_embeddings`: Embedding model for chunking (separate from retrieval embeddings)
+  - `"all-MiniLM-L6-v2"` - Fast, lightweight (recommended)
+  - `"BAAI/bge-base-en-v1.5"` - Balanced performance
+  - `"BAAI/bge-small-en-v1.5"` - Smaller, faster
+  - `"sentence-transformers/all-mpnet-base-v2"` - Higher quality
+
+**Example:**
+
+```json
+{
+  "name": "semantic_t0.8_miniLM",
+  "function": "chunk_semantic",
+  "params": {
+    "similarity_threshold": 0.8,
+    "chunking_embeddings": "all-MiniLM-L6-v2"
+  }
+}
+```
+
+**Scientific Design:**
+The semantic chunker uses **separate embeddings** for chunking vs. retrieval to maintain scientific rigor and avoid
+confounding variables. This allows you to test whether the chunking model affects results independently of the retrieval
+model.
+
+**How it works:**
+
+1. Splits text into sentences
+2. Computes embeddings for each sentence
+3. Calculates similarity between consecutive sentences
+4. Creates chunk boundaries when similarity drops below the percentile threshold
+5. Results in semantically coherent chunks that respect topic boundaries
+
+### Running Multiple Experiments
+
+```bash
+# Run all config files in sequence
+python run.py --run-all-configs
+
+# Run specific configuration
+python run.py --config-json configs/1_full_parameter_sweep.json
+
+# Run with custom parameters
+python run.py --config-json configs/0_base_experiment.json --limit 10
+```
 
 ### Evaluation Metrics
 
-- **MAP (Mean Average Precision)** - Overall retrieval quality
-- **MRR (Mean Reciprocal Rank)** - First relevant result ranking
-- **NDCG@K** - Normalized discounted cumulative gain
-- **Precision@K, Recall@K, F1@K** - Standard IR metrics
+All experiments automatically compute:
+
+- **MAP (Mean Average Precision)** - Overall retrieval quality across all ranks
+- **MRR (Mean Reciprocal Rank)** - Quality of the first relevant result
+- **NDCG@K** - Normalized discounted cumulative gain at rank K
+- **Precision@K** - Proportion of relevant documents in top K
+- **Recall@K** - Proportion of relevant documents retrieved in top K
+- **F1@K** - Harmonic mean of Precision@K and Recall@K
 
 ## Output and Results
 
@@ -249,17 +399,15 @@ pytest tests/
 
 ### 2. Docker Testing
 ```bash
-# Test Docker container locally
-chmod +x test-docker-locally.sh
-./test-docker-locally.sh
+# Build Docker container locally (from project root)
+bash docker/build-and-upload.sh dev
 ```
 
 ### 3. Production Deployment
 
 ```bash
-# Build and upload to Docker Hub
-chmod +x build-and-upload.sh
-./build-and-upload.sh
+# Build and upload to Docker Hub (from project root)
+bash docker/build-and-upload.sh
 ```
 
 ### 4. RunPod Execution
