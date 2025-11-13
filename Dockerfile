@@ -7,9 +7,15 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean \
     && apt-get autoremove -y
+
+# Install runpodctl CLI
+RUN curl -o runpodctl https://github.com/runpod/runpodctl/releases/latest/download/runpodctl-linux-amd64 \
+    && chmod +x runpodctl \
+    && mv runpodctl /usr/local/bin/
 
 # Copy requirements for faster Docker builds
 COPY requirements.txt .
@@ -28,6 +34,7 @@ COPY src/ ./src/
 COPY configs/ ./configs/
 COPY data/ ./data/
 COPY run.py .
+COPY run_and_stop.sh .
 
 # Set Python path
 ENV PYTHONPATH=/app
@@ -41,5 +48,8 @@ RUN python -m nltk.downloader punkt punkt_tab
 # Set workspace as volume mount point
 VOLUME /workspace
 
-# Default command - run all experiments with output to workspace
-CMD python run.py --run-all-configs && echo "Process exited with code $? at path: $(pwd)"
+# Make the script executable
+RUN chmod +x /app/run_and_stop.sh
+
+# Default command - run experiments and stop pod
+CMD ["/app/run_and_stop.sh"]
