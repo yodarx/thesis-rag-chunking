@@ -2,7 +2,6 @@
   "embedding_model": "BAAI/bge-large-en-v1.5",
   "retriever_type": "faiss",
   "top_k": 5,
-  "limit": 1,
   "log_matches": true,
   "input_file": "data/preprocessed/preprocessed_2025-11-03_all.jsonl",
   "experiments": [
