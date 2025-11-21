@@ -17,7 +17,16 @@ class Vectorizer:
         Erstellt eine neue Vectorizer-Instanz durch Laden eines Modells
         anhand seines Namens. Wählt automatisch GPU, falls verfügbar, sonst CPU.
         """
-        device = "cuda" if torch.cuda.is_available() else None
+        if hasattr(torch, "xpu") and torch.xpu.is_available():
+            device = "xpu"
+        elif torch.cuda.is_available():
+            device = "cuda"
+        else:
+            device = None
+        print("--- Vectorizer Gerät: ", device)
+        if hasattr(torch, "xpu"):
+            print("torch.xpu.is_available():", torch.xpu.is_available())
+
         print("--- Vectorizer Gerät: ", device)
         loaded_model = SentenceTransformer(model_name, device=device)
         return cls(loaded_model)

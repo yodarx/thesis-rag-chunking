@@ -158,8 +158,12 @@ def cli_entry():
     args = parser.parse_args()
 
     if args.run_all_configs:
-        # Create ONE shared output directory for all configs
-        output_dir, timestamp = _create_output_directory()
+        # Create base timestamp for all experiments
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        base_dir = "/workspace" if os.path.exists("/workspace") else "results"
+        main_output_dir = os.path.join(base_dir, "results", timestamp)
+        os.makedirs(main_output_dir, exist_ok=True)
+
         config_dir = os.path.join(os.path.dirname(__file__), "configs")
         config_files = sorted(
             [os.path.join(config_dir, f) for f in os.listdir(config_dir) if f.endswith(".json")]
@@ -168,21 +172,30 @@ def cli_entry():
         print(
             f"Found {len(config_files)} config files: {[os.path.basename(f) for f in config_files]}"
         )
+        print(f"Main results directory: {main_output_dir}")
 
         if not config_files:
             print("No config files found in configs/ directory.")
             sys.exit(1)
 
         for config_path in config_files:
-            print(f"\nRunning experiment for config: {os.path.basename(config_path)}")
+            config_name = os.path.splitext(os.path.basename(config_path))[0]
+            experiment_output_dir = os.path.join(main_output_dir, config_name)
+            os.makedirs(experiment_output_dir, exist_ok=True)
+
+            print(f"\nRunning experiment for config: {config_name}")
+            print(f"Experiment output directory: {experiment_output_dir}")
+
             try:
                 main_with_shared_output(
-                    config_json=config_path, output_dir=output_dir, timestamp=timestamp
+                    config_json=config_path,
+                    output_dir=experiment_output_dir,
+                    timestamp=timestamp
                 )
-                print(f"Experiment completed for {os.path.basename(config_path)}")
+                print(f"Experiment completed for {config_name}")
             except Exception as e:
                 print(
-                    f"Experiment failed for {os.path.basename(config_path)}: {e}", file=sys.stderr
+                    f"Experiment failed for {config_name}: {e}", file=sys.stderr
                 )
 
         print("All experiments completed successfully!")
