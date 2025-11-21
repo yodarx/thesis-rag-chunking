@@ -1,4 +1,6 @@
 import time
+import os
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -13,6 +15,13 @@ from .results import ResultsHandler
 from .retriever import FaissRetriever
 
 
+def create_index_name(experiment_name: str, model_name: str) -> str:
+    """Creates a descriptive name for the index directory."""
+    # Sanitize model name for use in file paths
+    sanitized_model_name = model_name.replace("/", "_")
+    return f"{experiment_name}_{sanitized_model_name}"
+
+
 class ExperimentRunner:
     def __init__(
         self,
@@ -22,7 +31,7 @@ class ExperimentRunner:
         retriever: FaissRetriever,
         results_handler: ResultsHandler,
         top_k: int,
-        chunking_vectorizer: Vectorizer | None = None,
+        embedding_model_name: str,
     ):
         self.experiments = experiments
         self.dataset = dataset
@@ -30,84 +39,91 @@ class ExperimentRunner:
         self.retriever = retriever
         self.results_handler = results_handler
         self.top_k = top_k
-        # Default chunking vectorizer (can be overridden per experiment)
-        self.default_chunking_vectorizer = (
-            chunking_vectorizer if chunking_vectorizer is not None else vectorizer
-        )
-        # Cache for loaded chunking models to avoid reloading
-        self._chunking_model_cache: dict[str, Vectorizer] = {}
-
-    def _get_chunking_vectorizer(self, model_name: str) -> Vectorizer:
-        """Load or retrieve cached chunking vectorizer for a given model name."""
-        if model_name not in self._chunking_model_cache:
-            print(f"Loading chunking model: {model_name}")
-            self._chunking_model_cache[model_name] = Vectorizer.from_model_name(model_name)
-        return self._chunking_model_cache[model_name]
-
-    def _prepare_chunk_parameters(self, experiment: dict[str, Any]) -> dict[str, Any]:
-        chunk_params = experiment["params"].copy()
-
-        if experiment["function"].__name__ == "chunk_semantic":
-            # Check if chunking_embeddings is specified in the experiment params
-            if "chunking_embeddings" in chunk_params:
-                model_name = chunk_params["chunking_embeddings"]
-
-                # If it's a string, load the model
-                if isinstance(model_name, str):
-                    chunk_params["chunking_embeddings"] = self._get_chunking_vectorizer(model_name)
-                # Otherwise, it's already a Vectorizer instance (from tests)
-            else:
-                # Use default chunking vectorizer if not specified
-                chunk_params["chunking_embeddings"] = self.default_chunking_vectorizer
-
-        return chunk_params
-
-    def _execute_chunking(
-        self, document: str, chunk_func: Callable, chunk_params: dict[str, Any]
-    ) -> (list[str], float):
-        start_time = time.time()
-        chunks = chunk_func(document, **chunk_params)
-        chunking_time = time.time() - start_time
-        return chunks, chunking_time
+        self.embedding_model_name = embedding_model_name
 
     def _process_single_experiment(
         self, data_point: dict[str, Any], experiment: dict[str, Any]
     ) -> None:
         exp_name = experiment["name"]
-        chunk_func = experiment["function"]
-        chunk_params = self._prepare_chunk_parameters(experiment)
 
-        chunks, chunking_time = self._execute_chunking(
-            data_point["document_text"], chunk_func, chunk_params
-        )
+        # Instead of chunking, we now load the pre-built index
+        index_folder_name = create_index_name(exp_name, self.embedding_model_name)
+        index_dir = os.path.join("indices", index_folder_name)
 
-        if not chunks:
-            print(f"Warning: No chunks created for {exp_name} on {data_point['sample_id']}")
+        index_path = os.path.join(index_dir, "index.faiss")
+        chunks_path = os.path.join(index_dir, "chunks.json")
+        metadata_path = os.path.join(index_dir, "metadata.json")
+
+        if not all(os.path.exists(p) for p in [index_path, chunks_path, metadata_path]):
+            print(f"Warning: Index for experiment '{exp_name}' not found. Skipping.")
+            print(f"Looked in: {index_dir}")
             return
 
-        chunk_embeddings_list = self.vectorizer.embed_documents(chunks)
-        chunk_embeddings = np.array(chunk_embeddings_list, dtype="float32")
-        indices = self.retriever.search(data_point["question"], chunk_embeddings, self.top_k)
+        # Load the index and chunks into the retriever
+        self.retriever.load_index(index_path, chunks_path)
+
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+
+        # Retrieve relevant chunks for the question
+        retrieved_chunks = self.retriever.retrieve(data_point["question"], self.top_k)
+
+        # We need to find which document the retrieved chunks belong to,
+        # but for this evaluation, we assume the retrieval is across all docs,
+        # which is what we want.
 
         log_matches = experiment.get("log_matches", False)
         metrics = evaluation.calculate_metrics(
-            retrieved_chunks=[chunks[i] for i in indices],
+            retrieved_chunks=retrieved_chunks,
             gold_passages=data_point["gold_passages"],
             k=self.top_k,
             question=data_point["question"],
             log_matches=log_matches,
         )
 
+        # Chunking time is now 0 since it's pre-processed
         self.results_handler.add_result_record(
-            data_point, exp_name, chunking_time, len(chunks), metrics
+            data_point, exp_name, chunking_time=0, num_chunks=self.retriever.index.ntotal, metrics=metrics
         )
 
     def run_all(self) -> pd.DataFrame:
         print(f"Starting experiments with {len(self.dataset)} data points.")
 
-        for data_point in tqdm(self.dataset, desc="Processing Data Points"):
-            for experiment in self.experiments:
-                self._process_single_experiment(data_point, experiment)
+        # The outer loop should be experiments, as we load an index per experiment
+        for experiment in self.experiments:
+            exp_name = experiment["name"]
+            print(f"\nProcessing experiment: {exp_name}")
+
+            # Load the index for this experiment once
+            index_folder_name = create_index_name(exp_name, self.embedding_model_name)
+            index_dir = os.path.join("indices", index_folder_name)
+            index_path = os.path.join(index_dir, "index.faiss")
+            chunks_path = os.path.join(index_dir, "chunks.json")
+
+            if not os.path.exists(index_path) or not os.path.exists(chunks_path):
+                print(f"Warning: Index for experiment '{exp_name}' not found. Skipping.")
+                print(f"  - Looked for: {index_path}")
+                continue
+
+            self.retriever.load_index(index_path, chunks_path)
+
+            for data_point in tqdm(self.dataset, desc=f"Evaluating {exp_name}"):
+                # Retrieve relevant chunks for the question
+                retrieved_chunks = self.retriever.retrieve(data_point["question"], self.top_k)
+
+                log_matches = experiment.get("log_matches", False)
+                metrics = evaluation.calculate_metrics(
+                    retrieved_chunks=retrieved_chunks,
+                    gold_passages=data_point["gold_passages"],
+                    k=self.top_k,
+                    question=data_point["question"],
+                    log_matches=log_matches,
+                )
+
+                # Chunking time is 0, num_chunks is from the loaded index
+                self.results_handler.add_result_record(
+                    data_point, exp_name, chunking_time=0, num_chunks=self.retriever.index.ntotal, metrics=metrics
+                )
 
         print("\nAll experiments finished. Saving results...")
 

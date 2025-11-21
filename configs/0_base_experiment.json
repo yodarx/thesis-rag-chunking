@@ -2,7 +2,6 @@
   "embedding_model": "all-MiniLM-L6-v2",
   "retriever_type": "faiss",
   "top_k": 5,
-  "limit": 1,
   "input_file": "data/preprocessed/preprocessed_2025-11-03_all.jsonl",
   "experiments": [
     {
