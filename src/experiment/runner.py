@@ -1,10 +1,7 @@
-import time
-import os
 import json
-from collections.abc import Callable
+import os
 from typing import Any
 
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -62,8 +59,8 @@ class ExperimentRunner:
         # Load the index and chunks into the retriever
         self.retriever.load_index(index_path, chunks_path)
 
-        with open(metadata_path, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
+        with open(metadata_path, encoding="utf-8") as f:
+            json.load(f)
 
         # Retrieve relevant chunks for the question
         retrieved_chunks = self.retriever.retrieve(data_point["question"], self.top_k)
@@ -83,7 +80,11 @@ class ExperimentRunner:
 
         # Chunking time is now 0 since it's pre-processed
         self.results_handler.add_result_record(
-            data_point, exp_name, chunking_time=0, num_chunks=self.retriever.index.ntotal, metrics=metrics
+            data_point,
+            exp_name,
+            chunking_time=0,
+            num_chunks=self.retriever.index.ntotal,
+            metrics=metrics,
         )
 
     def run_all(self) -> pd.DataFrame:
@@ -122,7 +123,11 @@ class ExperimentRunner:
 
                 # Chunking time is 0, num_chunks is from the loaded index
                 self.results_handler.add_result_record(
-                    data_point, exp_name, chunking_time=0, num_chunks=self.retriever.index.ntotal, metrics=metrics
+                    data_point,
+                    exp_name,
+                    chunking_time=0,
+                    num_chunks=self.retriever.index.ntotal,
+                    metrics=metrics,
                 )
 
         print("\nAll experiments finished. Saving results...")

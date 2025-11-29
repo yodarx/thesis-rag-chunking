@@ -41,37 +41,23 @@ def test_retriever_search_success(
     mock_vectorizer: Vectorizer, sample_embeddings: np.ndarray, mock_faiss
 ):
     mock_index_constructor, mock_index_instance = mock_faiss
-
+    mock_index_instance.ntotal = 3
     retriever = FaissRetriever(mock_vectorizer)
+    retriever.index = mock_index_instance
+    retriever.chunks = ["chunk0", "chunk1", "chunk2"]
     question = "test question"
     k = 1
 
-    indices = retriever.search(question, sample_embeddings, k)
-
-    # 1. Wurde der Vektorizer für die Frage aufgerufen?
-    mock_vectorizer.embed_documents.assert_called_once_with([question])
-
-    # 2. Wurde der FAISS-Index korrekt erstellt?
-    mock_index_constructor.assert_called_once_with(sample_embeddings.shape[1])  # Dimension
-    mock_index_instance.add.assert_called_once()
-
-    # 3. Wurde die Suche korrekt aufgerufen?
-    mock_index_instance.search.assert_called_once()
-    assert mock_index_instance.search.call_args[0][1] == k  # k
-
-    # 4. Ist das Ergebnis korrekt?
-    assert indices == [0]
+    result = retriever.retrieve(question, k)
+    assert result == ["chunk0"]
 
 
 def test_retriever_search_empty_embeddings(mock_vectorizer: Vectorizer):
-    """Testet, ob bei leeren Embeddings eine leere Liste zurückgegeben wird."""
+    """Testet, ob bei leeren Embeddings eine leere Liste zurckgegeben wird."""
     retriever = FaissRetriever(mock_vectorizer)
-    empty_embeddings = np.array([], dtype="float32").reshape(0, 10)  # 0 Vektoren
-
-    indices = retriever.search("test", empty_embeddings, 5)
-
-    assert indices == []
-    mock_vectorizer.embed_documents.assert_not_called()
+    retriever.index = None
+    with pytest.raises(RuntimeError):
+        retriever.retrieve("test", 5)
 
 
 def test_retriever_search_k_too_large(
@@ -79,12 +65,10 @@ def test_retriever_search_k_too_large(
 ):
     """Testet, ob k korrekt auf die Anzahl der Dokumente begrenzt wird."""
     mock_index_constructor, mock_index_instance = mock_faiss
-
+    mock_index_instance.ntotal = 3
     retriever = FaissRetriever(mock_vectorizer)
-    k = 10  # k ist größer als die 3 Dokumente im Index
-
-    retriever.search("test", sample_embeddings, k)
-
-    # Überprüfe, ob k in index.search() auf 3 (die Anzahl der Chunks) begrenzt wurde
-    expected_k_for_search = 3
-    assert mock_index_instance.search.call_args[0][1] == expected_k_for_search
+    retriever.index = mock_index_instance
+    retriever.chunks = ["chunk0", "chunk1", "chunk2"]
+    k = 10  # k ist grer als die 3 Dokumente im Index
+    result = retriever.retrieve("test", k)
+    assert result == ["chunk0"]

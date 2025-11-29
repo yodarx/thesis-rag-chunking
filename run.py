@@ -38,7 +38,9 @@ def main(config_json: str = None):
 
 
 def cli_entry():
-    parser = argparse.ArgumentParser(description="Run RAG chunking experiments from pre-built indices.")
+    parser = argparse.ArgumentParser(
+        description="Run RAG chunking experiments from pre-built indices."
+    )
     parser.add_argument(
         "--config-json",
         type=str,
@@ -63,7 +65,9 @@ def cli_entry():
             [os.path.join(config_dir, f) for f in os.listdir(config_dir) if f.endswith(".json")]
         )
 
-        print(f"Found {len(config_files)} config files: {[os.path.basename(f) for f in config_files]}")
+        print(
+            f"Found {len(config_files)} config files: {[os.path.basename(f) for f in config_files]}"
+        )
         print(f"Main results directory: {main_output_dir}")
 
         if not config_files:
@@ -80,9 +84,7 @@ def cli_entry():
 
             try:
                 main_with_shared_output(
-                    config_json=config_path,
-                    output_dir=experiment_output_dir,
-                    timestamp=timestamp
+                    config_json=config_path, output_dir=experiment_output_dir, timestamp=timestamp
                 )
                 print(f"Experiment completed for {config_name}")
             except Exception as e:

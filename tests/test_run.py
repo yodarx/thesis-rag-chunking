@@ -7,6 +7,8 @@ from pytest_mock import MockerFixture
 
 import run
 
+config_path = os.path.join(os.path.dirname(__file__), "test_experiment_config.json")
+
 
 @pytest.fixture
 def mock_dependencies(mocker: MockerFixture):
@@ -47,7 +49,6 @@ def mock_dependencies(mocker: MockerFixture):
 
 
 def test_run_main_workflow(mock_dependencies, mocker):
-    config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
@@ -58,7 +59,7 @@ def test_run_main_workflow(mock_dependencies, mocker):
 
     mock_dependencies["create_dir"].assert_called_once()
     mock_dependencies["load_data"].assert_called_once_with(
-        config_data["input_file"], limit=config_data["limit"]
+        config_data["input_file"], limit=config_data.get("limit")
     )
     # Now expects only ONE call for the retrieval model
     # Chunking models are loaded on-demand by ExperimentRunner
@@ -76,7 +77,6 @@ def test_run_main_workflow(mock_dependencies, mocker):
 
 
 def test_run_main_no_data(mock_dependencies, mocker):
-    config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
@@ -89,14 +89,13 @@ def test_run_main_no_data(mock_dependencies, mocker):
     mock_dependencies["Runner"].assert_not_called()
     mock_dependencies["visualize"].assert_not_called()
     mock_dependencies["load_data"].assert_called_once_with(
-        config_data["input_file"], limit=config_data["limit"]
+        config_data["input_file"], limit=config_data.get("limit")
     )
 
 
 def test_run_main_unknown_retriever_type(mock_dependencies, mocker, capsys):
     import sys
 
-    config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
     config_data_invalid = dict(config_data)
@@ -118,7 +117,6 @@ def test_run_main_unknown_retriever_type(mock_dependencies, mocker, capsys):
 
 def test_config_is_copied_to_results_local_environment(mock_dependencies, mocker):
     """Test config copying in local environment (no /workspace directory)."""
-    config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
@@ -134,13 +132,12 @@ def test_config_is_copied_to_results_local_environment(mock_dependencies, mocker
 
     # Check that the config file is copied to the correct results directory
     output_dir = mock_dependencies["create_dir"].return_value[0]  # Use mock_dir directly
-    expected_dest = os.path.join(output_dir, "experiment_config.json")
+    expected_dest = os.path.join(output_dir, "experiment_config_test_experiment_config.json")
     mock_copy.assert_called_once_with(config_path, expected_dest)
 
 
 def test_config_is_copied_to_results_runpod_environment(mock_dependencies, mocker):
     """Test config copying in RunPod environment (with /workspace directory)."""
-    config_path = "configs/0_base_experiment.json"
     with open(config_path) as f:
         config_data = json.load(f)
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
@@ -152,13 +149,13 @@ def test_config_is_copied_to_results_runpod_environment(mock_dependencies, mocke
     def exists_side_effect(path):
         return path == "/workspace"
 
-    mock_exists = mocker.patch("os.path.exists", side_effect=exists_side_effect)
+    mocker.patch("os.path.exists", side_effect=exists_side_effect)
 
     run.main(config_json=config_path)
 
     # Check that the config file is copied to the correct results directory
     output_dir = mock_dependencies["create_dir"].return_value[0]  # Use mock_dir directly
-    expected_dest = os.path.join(output_dir, "experiment_config.json")
+    expected_dest = os.path.join(output_dir, "experiment_config_test_experiment_config.json")
     mock_copy.assert_called_once_with(config_path, expected_dest)
 
 
@@ -168,7 +165,6 @@ def test_run_all_configs_sequential(mocker, mock_dependencies):
         "2_model_sensitivity_bge_large.json",
         "3_top_k_sensitivity_k1.json",
     ]
-    config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "configs")
     mocker.patch("os.listdir", return_value=config_files)
     mocker.patch("os.path.dirname", return_value=os.path.dirname(os.path.dirname(__file__)))
 
