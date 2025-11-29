@@ -116,7 +116,7 @@ def test_create_and_save_summary(mocker):
     mock_grouped_object.agg.assert_called_once()
     mock_agg_result.reset_index.assert_called_once()
 
-    mock_join.assert_called_once_with("test_dir", "test_ts_summary_results.csv")
+    mock_join.assert_called_once_with("test_dir", "test_ts_summary.csv")
     mock_final_df.to_csv.assert_called_once_with("test_dir/test_ts_summary.csv", index=False)
 
     assert df is mock_final_df

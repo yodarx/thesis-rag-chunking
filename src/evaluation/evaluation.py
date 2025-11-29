@@ -26,7 +26,7 @@ def calculate_metrics(
     Berechnet Retrieval-Metriken (MRR, MAP, NDCG@k, P@k, R@k, F1@k)
     und loggt optional Treffer.
     """
-    empty_metrics = {
+    empty_metrics: dict[str, float] = {
         "mrr": 0.0,
         "map": 0.0,
         "ndcg_at_k": 0.0,
@@ -37,85 +37,73 @@ def calculate_metrics(
     if not retrieved_chunks or not gold_passages:
         return empty_metrics
 
-    chunks_at_k = retrieved_chunks[:k]
-    match_results = _get_match_results(chunks_at_k, gold_passages)
+    chunks_at_k: list[str] = retrieved_chunks[:k]
+    match_results: list[MatchResult] = _get_match_results(chunks_at_k, gold_passages)
 
-    if question is not None and log_matches:
-        _log_matches(question, chunks_at_k, match_results)
+    relevance_scores: list[int] = [1 if res.is_relevant else 0 for res in match_results]
+    total_relevant_gold: int = len(gold_passages)
 
-    relevance_scores = [1 if res.is_relevant else 0 for res in match_results]
-    total_relevant_gold = len(gold_passages)
+    precision: float = calculate_precision_at_k(relevance_scores)
+    recall: float = calculate_recall_at_k(relevance_scores, total_relevant_gold)
 
-    precision = calculate_precision_at_k(relevance_scores)
-    recall = calculate_recall_at_k(relevance_scores, total_relevant_gold)
-    f1 = calculate_f1_score_at_k(precision, recall)
+    # --- Logging logic ---
+    if log_matches and question is not None:
+        print(f"Question: {question}")
+        print(f"Retrieved Chunks: {chunks_at_k}")
+        print(f"Gold Passages: {gold_passages}")
+        found_match = False
+        for idx, res in enumerate(match_results):
+            if res.is_relevant:
+                print(f"Match at position {idx + 1}: {res.matching_gold}")
+                found_match = True
+        if not found_match:
+            print("NO MATCHES FOUND")
 
     return {
         "mrr": calculate_mrr(relevance_scores),
         "map": calculate_map(relevance_scores),
-        "ndcg_at_k": calculate_ndcg(relevance_scores, k),
+        "ndcg_at_k": calculate_ndcg_at_k(relevance_scores),
         "precision_at_k": precision,
         "recall_at_k": recall,
-        "f1_score_at_k": f1,
+        "f1_score_at_k": calculate_f1_score_at_k(precision, recall),
     }
 
 
 # --- Metrik-Berechnungs-Helfer ---
 def calculate_mrr(relevance_scores: list[int]) -> float:
     """Berechnet den Mean Reciprocal Rank für eine einzelne Abfrage."""
-    for i, score in enumerate(relevance_scores):
-        if score > 0:
-            return 1.0 / (i + 1)
+    for idx, rel in enumerate(relevance_scores, 1):
+        if rel:
+            return 1.0 / idx
     return 0.0
 
 
 def calculate_map(relevance_scores: list[int]) -> float:
     """Berechnet die Mean Average Precision für eine einzelne Abfrage."""
-    if not any(relevance_scores):
-        return 0.0
-
-    precisions: list[float] = []
-    relevant_count = 0
-    for i, score in enumerate(relevance_scores):
-        if score > 0:
-            relevant_count += 1
-            precision = relevant_count / (i + 1)
-            precisions.append(precision)
-
-    return np.mean(precisions) if precisions else 0.0
+    relevant: int = 0
+    score: float = 0.0
+    for idx, rel in enumerate(relevance_scores, 1):
+        if rel:
+            relevant += 1
+            score += relevant / idx
+    return score / relevant if relevant else 0.0
 
 
-def calculate_ndcg(relevance_scores: list[int], k: int) -> float:
+def calculate_ndcg_at_k(relevance_scores: list[int]) -> float:
     """Berechnet den Normalized Discounted Cumulative Gain at k."""
-    dcg = 0.0
-    for i, score in enumerate(relevance_scores[:k]):
-        dcg += score / np.log2(i + 2)
-
-    ideal_scores = sorted(relevance_scores, reverse=True)
-    idcg = 0.0
-    for i, score in enumerate(ideal_scores[:k]):
-        idcg += score / np.log2(i + 2)
-
-    return dcg / idcg if idcg > 0 else 0.0
+    dcg: float = sum(rel / np.log2(idx + 2) for idx, rel in enumerate(relevance_scores))
+    ideal: float = sum(1.0 / np.log2(idx + 2) for idx in range(sum(relevance_scores)))
+    return dcg / ideal if ideal > 0 else 0.0
 
 
-def calculate_precision_at_k(relevance_scores_at_k: list[int]) -> float:
+def calculate_precision_at_k(relevance_scores: list[int]) -> float:
     """Berechnet die Precision für die abgerufenen k Ergebnisse."""
-    num_retrieved = len(relevance_scores_at_k)
-    if num_retrieved == 0:
-        return 0.0
-
-    relevant_at_k = sum(relevance_scores_at_k)
-    return relevant_at_k / num_retrieved
+    return sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.0
 
 
-def calculate_recall_at_k(relevance_scores_at_k: list[int], total_relevant_gold: int) -> float:
+def calculate_recall_at_k(relevance_scores: list[int], total_relevant_gold: int) -> float:
     """Berechnet den Recall für die abgerufenen k Ergebnisse."""
-    if total_relevant_gold == 0:
-        return 0.0
-
-    relevant_retrieved = sum(relevance_scores_at_k)
-    return relevant_retrieved / total_relevant_gold
+    return sum(relevance_scores) / total_relevant_gold if total_relevant_gold else 0.0
 
 
 def calculate_f1_score_at_k(precision: float, recall: float) -> float:
@@ -125,46 +113,14 @@ def calculate_f1_score_at_k(precision: float, recall: float) -> float:
     return 2 * (precision * recall) / (precision + recall)
 
 
-# --- Logging- und Matching-Helfer ---
-
-
-def _find_first_matching_gold(chunk: str, gold_passages: list[str]) -> str | None:
-    """Findet die erste Gold-Passage, die im Chunk enthalten ist."""
-    chunk_lower = chunk.lower()
-    for gold in gold_passages:
-        if gold.lower() in chunk_lower:
-            return gold
-    return None
-
-
 def _get_match_results(chunks_at_k: list[str], gold_passages: list[str]) -> list[MatchResult]:
-    """Erstellt eine Liste von Match-Ergebnissen für die Relevanzprüfung."""
-    results: list[MatchResult] = []
+    """Erstellt eine Liste von Match-Ergebnissen für die Relevanzprüfung (case-insensitive substring match)."""
+    results = []
     for chunk in chunks_at_k:
-        match = _find_first_matching_gold(chunk, gold_passages)
-        if match:
-            results.append(MatchResult(is_relevant=True, matching_gold=match))
-        else:
-            results.append(MatchResult(is_relevant=False, matching_gold=None))
+        match = None
+        for gold in gold_passages:
+            if gold.lower() in chunk.lower():
+                match = gold
+                break
+        results.append(MatchResult(is_relevant=match is not None, matching_gold=match))
     return results
-
-
-def _log_matches(question: str, chunks_at_k: list[str], match_results: list[MatchResult]) -> None:
-    """Gibt gefundene Treffer in der Konsole aus."""
-    print("=" * 60)
-    print(f"Question: {question}")
-
-    found_match = False
-    for i, (chunk, result) in enumerate(zip(chunks_at_k, match_results, strict=False)):
-        if result.is_relevant:
-            found_match = True
-            print("-" * 20)
-            print(f"MATCH FOUND! (Rank {i + 1})")
-            print(f"  Matched Chunk: {chunk}")
-            print(f"  Gold Standard: {result.matching_gold}")
-            print("-" * 20)
-
-    if not found_match:
-        print("  NO MATCHES FOUND in Top-K.")
-
-    print("=" * 60)

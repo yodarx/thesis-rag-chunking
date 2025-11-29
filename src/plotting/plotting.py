@@ -4,9 +4,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-# --- Konfiguration ---
-
-# Metriken, die geplottet werden sollen
 METRICS_TO_PLOT: list[str] = [
     "mrr",
     "map",
@@ -16,7 +13,6 @@ METRICS_TO_PLOT: list[str] = [
     "f1_score_at_k",
 ]
 
-# Anzeigenamen für Titel und Achsenbeschriftungen
 METRIC_DISPLAY_NAMES: dict[str, str] = {
     "mrr": "Mean Reciprocal Rank (MRR)",
     "map": "Mean Average Precision (MAP)",
@@ -27,7 +23,29 @@ METRIC_DISPLAY_NAMES: dict[str, str] = {
 }
 
 
-# --- Private Plotting-Helfer ---
+def visualize_and_save_results(summary_df: pd.DataFrame, output_dir: str, timestamp: str) -> None:
+    """
+    Generiert und speichert Plots für alle wichtigen Retrieval-Metriken.
+    """
+    print(f"\nGenerating and saving plots in directory: {output_dir}")
+    sns.set_theme(style="whitegrid")
+
+    for metric in METRICS_TO_PLOT:
+        if metric not in summary_df.columns:
+            print(f"Warning: Metric '{metric}' not found in summary. Skipping plot.")
+            continue
+
+        display_name: str = METRIC_DISPLAY_NAMES.get(metric, metric)
+
+        _create_and_save_bar_plot(
+            df=summary_df,
+            metric=metric,
+            display_name=display_name,
+            output_dir=output_dir,
+            timestamp=timestamp,
+        )
+
+    print("\nAll plots were successfully saved.")
 
 
 def _create_and_save_bar_plot(
@@ -48,61 +66,9 @@ def _create_and_save_bar_plot(
     plt.ylabel("Chunking Strategy", fontsize=12)
 
     for container in bar_plot.containers:
-        bar_plot.bar_label(container, fmt="%.4f", padding=3)
+        bar_plot.bar_label(container, fmt="%.2f", label_type="edge")
 
-    filename = os.path.join(output_dir, f"{timestamp}_bar_{metric}.png")
-    plt.savefig(filename, bbox_inches="tight")
+    plt.tight_layout()
+    plot_path: str = os.path.join(output_dir, f"{timestamp}_{metric}_barplot.png")
+    plt.savefig(plot_path)
     plt.close()
-
-
-def _create_and_save_scatter_plot(
-    df: pd.DataFrame, metric: str, display_name: str, output_dir: str, timestamp: str
-) -> None:
-    """Erstellt und speichert ein Streudiagramm (Kosten-Nutzen) für eine Metrik."""
-    plt.figure(figsize=(11, 7))
-    sns.scatterplot(data=df, x="chunking_time_s", y=metric, hue="experiment", s=200, palette="deep")
-    plt.title(f"Cost-Benefit Analysis: {display_name} vs. Compute Time", fontsize=16, pad=20)
-    plt.xlabel("Average Chunking Time per Document (seconds)", fontsize=12)
-    plt.ylabel(display_name, fontsize=12)
-    plt.legend(title="Strategies", bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.grid(True, which="both", linestyle="--", linewidth=0.5)
-
-    filename = os.path.join(output_dir, f"{timestamp}_scatter_{metric}.png")
-    plt.savefig(filename, bbox_inches="tight")
-    plt.close()
-
-
-# --- Hauptfunktion ---
-
-
-def visualize_and_save_results(summary_df: pd.DataFrame, output_dir: str, timestamp: str) -> None:
-    """
-    Generiert und speichert Plots für alle wichtigen Retrieval-Metriken.
-    """
-    print(f"\nGenerating and saving plots in directory: {output_dir}")
-    sns.set_theme(style="whitegrid")
-
-    for metric in METRICS_TO_PLOT:
-        if metric not in summary_df.columns:
-            print(f"Warning: Metric '{metric}' not found in summary. Skipping plot.")
-            continue
-
-        display_name = METRIC_DISPLAY_NAMES.get(metric, metric)
-
-        _create_and_save_bar_plot(
-            df=summary_df,
-            metric=metric,
-            display_name=display_name,
-            output_dir=output_dir,
-            timestamp=timestamp,
-        )
-
-        _create_and_save_scatter_plot(
-            df=summary_df,
-            metric=metric,
-            display_name=display_name,
-            output_dir=output_dir,
-            timestamp=timestamp,
-        )
-
-    print("\nAll plots were successfully saved.")

@@ -5,9 +5,9 @@ import pandas as pd
 
 
 class ResultsHandler:
-    def __init__(self, output_dir: str, timestamp: str):
-        self.output_dir = output_dir
-        self.timestamp = timestamp
+    def __init__(self, output_dir: str, timestamp: str) -> None:
+        self.output_dir: str = output_dir
+        self.timestamp: str = timestamp
         self.all_results: list[dict[str, Any]] = []
 
     def add_result_record(
@@ -18,7 +18,7 @@ class ResultsHandler:
         num_chunks: int,
         metrics: dict[str, float],
     ) -> None:
-        record = {
+        record: dict[str, Any] = {
             "sample_id": data_point["sample_id"],
             "experiment": experiment_name,
             "chunking_time_s": chunking_time,
@@ -31,16 +31,19 @@ class ResultsHandler:
         if not self.all_results:
             return pd.DataFrame()
 
-        results_df = pd.DataFrame(self.all_results)
-        filepath = os.path.join(self.output_dir, f"{self.timestamp}_detailed_results.csv")
+        results_df: pd.DataFrame = pd.DataFrame(self.all_results)
+        filepath: str = self._get_detailed_results_path()
         results_df.to_csv(filepath, index=False)
         return results_df
+
+    def _get_detailed_results_path(self) -> str:
+        return os.path.join(self.output_dir, f"{self.timestamp}_detailed_results.csv")
 
     def create_and_save_summary(self, detailed_df: pd.DataFrame) -> pd.DataFrame:
         if detailed_df.empty:
             return pd.DataFrame()
 
-        summary_df = (
+        summary_df: pd.DataFrame = (
             detailed_df.groupby("experiment")
             .agg(
                 {
@@ -50,16 +53,17 @@ class ResultsHandler:
                     "precision_at_k": "mean",
                     "recall_at_k": "mean",
                     "f1_score_at_k": "mean",
-                    "chunking_time_s": "mean",
-                    "num_chunks": "mean",
                 }
             )
             .reset_index()
         )
 
-        filepath = os.path.join(self.output_dir, f"{self.timestamp}_summary_results.csv")
-        summary_df.to_csv(filepath, index=False)
+        summary_path: str = self._get_summary_path()
+        summary_df.to_csv(summary_path, index=False)
         return summary_df
+
+    def _get_summary_path(self) -> str:
+        return os.path.join(self.output_dir, f"{self.timestamp}_summary.csv")
 
     def display_summary(self, summary_df: pd.DataFrame) -> None:
         print("\n--- Aggregated Results ---")

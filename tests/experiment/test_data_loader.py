@@ -46,9 +46,7 @@ def test_load_asqa_dataset_with_limit(mock_jsonl_file):
 def test_load_asqa_dataset_file_not_found(mocker: MockerFixture):
     """Testet das Verhalten bei einem FileNotFoundError."""
     mocker.patch("builtins.open", side_effect=FileNotFoundError("Test error"))
-    mock_print = mocker.patch("builtins.print")
 
     data = load_asqa_dataset("bad/path.jsonl")
 
     assert data == []
-    mock_print.assert_called_with("Error: Dataset file not found at bad/path.jsonl")

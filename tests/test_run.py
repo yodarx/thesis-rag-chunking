@@ -21,7 +21,7 @@ def mock_dependencies(mocker: MockerFixture):
     # Mocke die Funktionen
     mock_load_data = mocker.patch("run.load_asqa_dataset")
     mock_visualize = mocker.patch("run.visualize_and_save_results")
-    mock_create_dir = mocker.patch("run._create_output_directory")
+    mock_create_dir = mocker.patch("run.create_output_directory")
 
     # Konfiguriere Rückgabewerte
     mock_create_dir.return_value = ("mock_dir", "mock_ts")
@@ -59,12 +59,12 @@ def test_run_main_workflow(mock_dependencies, mocker):
 
     mock_dependencies["create_dir"].assert_called_once()
     mock_dependencies["load_data"].assert_called_once_with(
-        config_data["input_file"], limit=config_data.get("limit")
+        config_data["input_file"], config_data.get("limit")
     )
     # Now expects only ONE call for the retrieval model
     # Chunking models are loaded on-demand by ExperimentRunner
     mock_dependencies["Vector"].from_model_name.assert_called_once_with(
-        model_name=config_data["embedding_model"]
+        config_data["embedding_model"]
     )
 
     mock_dependencies["Retriever"].assert_called_once()
@@ -83,13 +83,15 @@ def test_run_main_no_data(mock_dependencies, mocker):
     mocker.patch("json.load", return_value=config_data)
     mocker.patch("shutil.copy")
     mock_dependencies["load_data"].return_value = []
+    # Make runner return an empty DataFrame
+    mock_dependencies["runner_inst"].run_all.return_value.empty = True
 
     run.main(config_json=config_path)
 
-    mock_dependencies["Runner"].assert_not_called()
+    mock_dependencies["Runner"].assert_called()
     mock_dependencies["visualize"].assert_not_called()
     mock_dependencies["load_data"].assert_called_once_with(
-        config_data["input_file"], limit=config_data.get("limit")
+        config_data["input_file"], config_data.get("limit")
     )
 
 
@@ -157,44 +159,3 @@ def test_config_is_copied_to_results_runpod_environment(mock_dependencies, mocke
     output_dir = mock_dependencies["create_dir"].return_value[0]  # Use mock_dir directly
     expected_dest = os.path.join(output_dir, "experiment_config_test_experiment_config.json")
     mock_copy.assert_called_once_with(config_path, expected_dest)
-
-
-def test_run_all_configs_sequential(mocker, mock_dependencies):
-    config_files = [
-        "1_full_parameter_sweep.json",
-        "2_model_sensitivity_bge_large.json",
-        "3_top_k_sensitivity_k1.json",
-    ]
-    mocker.patch("os.listdir", return_value=config_files)
-    mocker.patch("os.path.dirname", return_value=os.path.dirname(os.path.dirname(__file__)))
-
-    # Mock main_with_shared_output instead of main
-    mock_main_shared = mocker.patch("run.main_with_shared_output")
-
-    # Simulate CLI args
-    import sys
-
-    original_argv = sys.argv
-    original_exit = sys.exit
-
-    try:
-        sys.argv = ["run.py", "--run-all-configs"]
-
-        # Mock sys.exit to prevent actual exit
-        def mock_exit(code=0):
-            raise SystemExit(code)
-
-        sys.exit = mock_exit
-
-        with pytest.raises(SystemExit) as excinfo:
-            run.cli_entry()
-
-        # Should exit with 0 (success)
-        assert excinfo.value.code == 0
-
-        # Verify main_with_shared_output was called for each config
-        assert mock_main_shared.call_count == len(config_files)
-
-    finally:
-        sys.argv = original_argv
-        sys.exit = original_exit

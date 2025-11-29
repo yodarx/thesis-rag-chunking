@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from src.chunking.chunk_semantic import LangChainEmbeddingWrapper, chunk_semantic
@@ -10,7 +12,7 @@ def sample_text_semantic() -> str:
 
 
 @pytest.fixture
-def mock_vectorizer(mocker):
+def mock_vectorizer(mocker: Any) -> Any:
     """
     Mocks a vectorizer that returns specific embeddings.
     SemanticChunker creates combinations of sentences (sliding window), not individual sentences.
@@ -24,7 +26,7 @@ def mock_vectorizer(mocker):
     """
     mock = mocker.Mock()
 
-    def embed_side_effect(texts):
+    def embed_side_effect(texts: list[str]) -> list[list[float]]:
         """Return embeddings based on text content to control semantic chunking."""
         embeddings = []
         for text in texts:
@@ -43,7 +45,7 @@ def mock_vectorizer(mocker):
     return mock
 
 
-def test_chunk_semantic_basic(sample_text_semantic: str, mock_vectorizer):
+def test_chunk_semantic_basic(sample_text_semantic: str, mock_vectorizer: Any) -> None:
     """Test that chunk_semantic correctly uses chunking_embeddings parameter."""
     chunks = chunk_semantic(
         sample_text_semantic, chunking_embeddings=mock_vectorizer, similarity_threshold=0.8
@@ -58,7 +60,7 @@ def test_chunk_semantic_basic(sample_text_semantic: str, mock_vectorizer):
     assert all(isinstance(chunk, str) for chunk in chunks)
 
 
-def test_chunk_semantic_no_split(sample_text_semantic: str, mock_vectorizer):
+def test_chunk_semantic_no_split(sample_text_semantic: str, mock_vectorizer: Any) -> None:
     """Test that high similarity threshold keeps text together."""
     chunks = chunk_semantic(
         sample_text_semantic, chunking_embeddings=mock_vectorizer, similarity_threshold=0.95
@@ -68,7 +70,7 @@ def test_chunk_semantic_no_split(sample_text_semantic: str, mock_vectorizer):
     assert len(chunks) >= 1
 
 
-def test_chunk_semantic_more_splits(sample_text_semantic: str, mock_vectorizer):
+def test_chunk_semantic_more_splits(sample_text_semantic: str, mock_vectorizer: Any) -> None:
     """Test that low similarity threshold creates more splits."""
     chunks = chunk_semantic(
         sample_text_semantic, chunking_embeddings=mock_vectorizer, similarity_threshold=0.4
@@ -78,14 +80,14 @@ def test_chunk_semantic_more_splits(sample_text_semantic: str, mock_vectorizer):
     assert len(chunks) >= 1
 
 
-def test_chunk_semantic_empty_text(mock_vectorizer):
+def test_chunk_semantic_empty_text(mock_vectorizer: Any) -> None:
     """Test that empty text returns empty list."""
     chunks = chunk_semantic("", chunking_embeddings=mock_vectorizer, similarity_threshold=0.8)
 
     assert chunks == []
 
 
-def test_chunk_semantic_single_sentence(mock_vectorizer):
+def test_chunk_semantic_single_sentence(mock_vectorizer: Any) -> None:
     """Test single sentence handling."""
     text = "Just one sentence."
     chunks = chunk_semantic(text, chunking_embeddings=mock_vectorizer, similarity_threshold=0.8)
@@ -94,14 +96,14 @@ def test_chunk_semantic_single_sentence(mock_vectorizer):
     assert chunks[0] == text
 
 
-def test_chunk_semantic_requires_embeddings():
+def test_chunk_semantic_requires_embeddings() -> None:
     """Test that chunking_embeddings parameter is required."""
     with pytest.raises(TypeError):
         # Should fail without chunking_embeddings
         chunk_semantic("Some text", similarity_threshold=0.8)
 
 
-def test_langchain_wrapper_integration(mock_vectorizer):
+def test_langchain_wrapper_integration(mock_vectorizer: Any) -> None:
     """Test that LangChainEmbeddingWrapper correctly wraps the vectorizer."""
     wrapper = LangChainEmbeddingWrapper(mock_vectorizer)
 

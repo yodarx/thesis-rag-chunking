@@ -2,17 +2,15 @@ import numpy as np
 import pytest
 from pytest_mock import MockerFixture
 
-from evaluation.evaluation import (
+from src.evaluation.evaluation import (
     calculate_f1_score_at_k,
     calculate_map,
     calculate_metrics,
     calculate_mrr,
-    calculate_ndcg,
+    calculate_ndcg_at_k,
     calculate_precision_at_k,
     calculate_recall_at_k,
 )
-
-# --- Fixtures für Testdaten ---
 
 
 @pytest.fixture
@@ -65,24 +63,23 @@ def test_calculate_map(perfect_scores, good_scores, poor_scores, no_scores):
 
 
 def test_calculate_ndcg(perfect_scores, good_scores, poor_scores, no_scores):
-    k = 5
     # Perfect DCG == Perfect IDCG
-    assert calculate_ndcg(perfect_scores, k) == pytest.approx(1.0)
+    assert calculate_ndcg_at_k(perfect_scores) == pytest.approx(1.0)
 
     # DCG = 1/log2(3) + 1/log2(4) + 1/log2(6) = 0.6309 + 0.5 + 0.3868 = 1.5177
     # IDCG = 1/log2(2) + 1/log2(3) + 1/log2(4) = 1 + 0.6309 + 0.5 = 2.1309
     # NDCG = 1.5177 / 2.1309 = 0.712...
     dcg = 1 / np.log2(2 + 1) + 1 / np.log2(3 + 1) + 1 / np.log2(5 + 1)
     idcg = 1 / np.log2(1 + 1) + 1 / np.log2(2 + 1) + 1 / np.log2(3 + 1)
-    assert calculate_ndcg(good_scores, k) == pytest.approx(dcg / idcg)
+    assert calculate_ndcg_at_k(good_scores) == pytest.approx(dcg / idcg)
 
     # DCG = 1/log2(5) = 0.4306
     # IDCG = 1/log2(2) = 1.0
     # NDCG = 0.4306 / 1.0 = 0.4306...
-    assert calculate_ndcg(poor_scores, k) == pytest.approx((1 / np.log2(4 + 1)) / 1.0)
+    assert calculate_ndcg_at_k(poor_scores) == pytest.approx((1 / np.log2(4 + 1)) / 1.0)
 
-    assert calculate_ndcg(no_scores, k) == pytest.approx(0.0)
-    assert calculate_ndcg([], k) == pytest.approx(0.0)
+    assert calculate_ndcg_at_k(no_scores) == pytest.approx(0.0)
+    assert calculate_ndcg_at_k([]) == pytest.approx(0.0)
 
 
 def test_calculate_precision_at_k(good_scores, no_scores):
@@ -225,3 +222,11 @@ def test_calculate_metrics_logging_no_match(mocker: MockerFixture):
 
     assert "Test?" in log_output
     assert "NO MATCHES FOUND" in log_output
+
+
+def test_calculate_metrics_basic() -> None:
+    retrieved_chunks: list[str] = ["a", "b", "c"]
+    gold_passages: list[str] = ["a", "d"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=2)
+    assert isinstance(metrics, dict)
+    assert all(isinstance(v, float) for v in metrics.values())

@@ -12,7 +12,7 @@ class EmbeddingVectorizer(Protocol):
 class LangChainEmbeddingWrapper:
     """Wrapper to make our vectorizer compatible with LangChain's SemanticChunker."""
 
-    def __init__(self, vectorizer: EmbeddingVectorizer):
+    def __init__(self, vectorizer: EmbeddingVectorizer) -> None:
         self.vectorizer = vectorizer
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:

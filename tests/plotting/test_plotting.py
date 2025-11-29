@@ -64,7 +64,6 @@ def test_visualize_and_save_results_main_loop(
     """
     # Mocke die *privaten Helferfunktionen* des Moduls, nicht die Plots selbst
     mock_bar = mocker.patch("plotting.plotting._create_and_save_bar_plot")
-    mock_scatter = mocker.patch("plotting.plotting._create_and_save_scatter_plot")
     mock_print = mocker.patch("builtins.print")
 
     test_dir = "test_output"
@@ -74,7 +73,6 @@ def test_visualize_and_save_results_main_loop(
 
     # Überprüfen, ob die Helfer für jede Metrik aufgerufen wurden
     assert mock_bar.call_count == len(plotting.METRICS_TO_PLOT)
-    assert mock_scatter.call_count == len(plotting.METRICS_TO_PLOT)
 
     # Stichprobenartig den ersten Aufruf prüfen
     first_metric = plotting.METRICS_TO_PLOT[0]
@@ -98,7 +96,6 @@ def test_visualize_skips_missing_metrics(mocker: MockerFixture, sample_summary_d
     übersprungen werden und eine Warnung ausgegeben wird.
     """
     mock_bar = mocker.patch("plotting.plotting._create_and_save_bar_plot")
-    mock_scatter = mocker.patch("plotting.plotting._create_and_save_scatter_plot")
     mock_print = mocker.patch("builtins.print")
 
     # Entferne eine Metrik aus dem Test-DataFrame
@@ -109,7 +106,6 @@ def test_visualize_skips_missing_metrics(mocker: MockerFixture, sample_summary_d
     # Sollte für alle Metriken *außer* der fehlenden aufgerufen werden
     expected_calls = len(plotting.METRICS_TO_PLOT) - 1
     assert mock_bar.call_count == expected_calls
-    assert mock_scatter.call_count == expected_calls
 
     # Überprüfe, ob die Warnung gedruckt wurde
     mock_print.assert_any_call("Warning: Metric 'mrr' not found in summary. Skipping plot.")
@@ -146,40 +142,7 @@ def test_create_and_save_bar_plot(sample_summary_df: pd.DataFrame, mock_plotting
     mock_bar_plot.bar_label.assert_called_once()
 
     # 4. Wurde die Datei korrekt gespeichert?
-    expected_filename = f"{test_dir}/{test_ts}_bar_{test_metric}.png"
-    mock_os_path_join.assert_called_with(test_dir, f"{test_ts}_bar_{test_metric}.png")
-    mock_plt.savefig.assert_called_with(expected_filename, bbox_inches="tight")
-    mock_plt.close.assert_called_once()
-
-
-def test_create_and_save_scatter_plot(sample_summary_df: pd.DataFrame, mock_plotting: dict):
-    """Testet die Erstellung des Streudiagramms im Detail."""
-    test_dir = "test_output"
-    test_ts = "2025-10-23"
-    test_metric = "map"
-    test_display = "MAP Test"
-
-    plotting._create_and_save_scatter_plot(
-        sample_summary_df, test_metric, test_display, test_dir, test_ts
-    )
-
-    mock_sns = mock_plotting["sns"]
-    mock_plt = mock_plotting["plt"]
-    mock_os_path_join = mock_plotting["os_path_join"]
-
-    # 1. Wurde das Plotting korrekt aufgerufen?
-    mock_sns.scatterplot.assert_called_once()
-    assert mock_sns.scatterplot.call_args.kwargs["x"] == "chunking_time_s"
-    assert mock_sns.scatterplot.call_args.kwargs["y"] == test_metric
-
-    # 2. Wurden Titel und Labels gesetzt?
-    mock_plt.title.assert_called_with(
-        f"Cost-Benefit Analysis: {test_display} vs. Compute Time", fontsize=16, pad=20
-    )
-    mock_plt.xlabel.assert_called_with("Average Chunking Time per Document (seconds)", fontsize=12)
-
-    # 3. Wurde die Datei korrekt gespeichert?
-    expected_filename = f"{test_dir}/{test_ts}_scatter_{test_metric}.png"
-    mock_os_path_join.assert_called_with(test_dir, f"{test_ts}_scatter_{test_metric}.png")
-    mock_plt.savefig.assert_called_with(expected_filename, bbox_inches="tight")
+    expected_filename = f"{test_dir}/{test_ts}_{test_metric}_barplot.png"
+    mock_os_path_join.assert_called_with(test_dir, f"{test_ts}_{test_metric}_barplot.png")
+    mock_plt.savefig.assert_called_with(expected_filename)
     mock_plt.close.assert_called_once()

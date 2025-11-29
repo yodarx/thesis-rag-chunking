@@ -7,8 +7,7 @@ from datetime import datetime
 from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
-from bs4.element import Tag
+from bs4 import BeautifulSoup, Tag
 from datasets import load_dataset
 from requests.exceptions import RequestException
 from tqdm import tqdm
@@ -19,7 +18,7 @@ CONTROL_CHARS_RE = re.compile(r"[\u200B\u200E\u200F]+")
 HTTP_HEADERS: dict[str, str] = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
 }
-BASE_PATH = "./data/preprocessed"
+BASE_PATH: str = "./data/preprocessed"
 
 
 # --- Datenstrukturen ---
@@ -53,8 +52,8 @@ def clean_text(text: str) -> str:
     text = text.replace("\u00a0", " ")
     text = CONTROL_CHARS_RE.sub("", text)
     text = WHITESPACE_RE.sub(" ", text)
-    lines = [ln.strip() for ln in text.splitlines()]
-    cleaned = "\n".join([ln for ln in lines if ln])
+    lines: list[str] = [ln.strip() for ln in text.splitlines()]
+    cleaned: str = "\n".join([ln for ln in lines if ln])
     return cleaned.strip()
 
 

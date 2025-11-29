@@ -8,7 +8,7 @@ def sample_text_sentences() -> str:
     return "Sentence one. Sentence two. Sentence three. Sentence four. Sentence five."
 
 
-def test_chunk_by_sentence_basic(sample_text_sentences: str):
+def test_chunk_by_sentence_basic(sample_text_sentences: str) -> None:
     chunks = chunk_by_sentence(sample_text_sentences, sentences_per_chunk=2)
     assert len(chunks) == 3
     assert chunks[0] == "Sentence one. Sentence two."
@@ -16,17 +16,17 @@ def test_chunk_by_sentence_basic(sample_text_sentences: str):
     assert chunks[2] == "Sentence five."
 
 
-def test_chunk_by_sentence_single_chunk(sample_text_sentences: str):
+def test_chunk_by_sentence_single_chunk(sample_text_sentences: str) -> None:
     chunks = chunk_by_sentence(sample_text_sentences, sentences_per_chunk=10)
     assert len(chunks) == 1
     assert chunks[0] == sample_text_sentences
 
 
-def test_chunk_by_sentence_empty_text():
+def test_chunk_by_sentence_empty_text() -> None:
     chunks = chunk_by_sentence("", sentences_per_chunk=2)
     assert chunks == []
 
 
-def test_chunk_by_sentence_invalid_chunk_size():
+def test_chunk_by_sentence_invalid_chunk_size() -> None:
     with pytest.raises(ValueError, match="must be greater than 0"):
         chunk_by_sentence("Test text.", sentences_per_chunk=0)
