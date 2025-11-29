@@ -74,19 +74,24 @@ def main(config_path: str):
         chunk_params = experiment["params"].copy()
         chunk_function = get_chunking_function(chunk_func_name)
 
+        index_folder_name = create_index_name(exp_name, embedding_model_name)
+        output_dir = os.path.join(base_index_dir, index_folder_name)
+
+        # --- Check if index already exists ---
+        if os.path.exists(output_dir) and os.path.exists(os.path.join(output_dir, "index.faiss")):
+            print(f"\nSkipping experiment '{exp_name}': Index already exists at '{output_dir}'")
+            continue
+
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"\nProcessing experiment: '{exp_name}'")
+        print(f"  - Index directory: '{output_dir}'")
+
         # Special handling for semantic chunking which requires a Vectorizer instance
         if chunk_func_name == "chunk_semantic":
             if "chunking_embeddings" in chunk_params and isinstance(chunk_params["chunking_embeddings"], str):
                 model_name = chunk_params["chunking_embeddings"]
                 print(f"  - Initializing semantic chunking model: {model_name}")
                 chunk_params["chunking_embeddings"] = Vectorizer.from_model_name(model_name)
-
-        index_folder_name = create_index_name(exp_name, embedding_model_name)
-        output_dir = os.path.join(base_index_dir, index_folder_name)
-        os.makedirs(output_dir, exist_ok=True)
-
-        print(f"\nProcessing experiment: '{exp_name}'")
-        print(f"  - Index directory: '{output_dir}'")
 
         all_chunks = []
         chunk_metadata = []
@@ -104,16 +109,45 @@ def main(config_path: str):
             print(f"  - No chunks were generated for '{exp_name}'. Skipping.")
             continue
 
-        # --- Create Embeddings ---
-        print(f"  - Creating {len(all_chunks)} embeddings...")
-        embeddings = vectorizer.embed_documents(all_chunks)
-        embeddings = np.array(embeddings).astype('float32') # FAISS requires float32
-        dimension = embeddings.shape[1]
+        # --- Create Embeddings and Build Index in Batches to save memory ---
+        print(f"  - Creating {len(all_chunks)} embeddings and building FAISS index...")
 
-        # --- Build and Save FAISS Index ---
-        print("  - Building FAISS index...")
-        index = faiss.IndexFlatL2(dimension)
-        index.add(embeddings)
+        # 1. Get dimension from the first chunk's embedding
+        first_embedding = vectorizer.embed_documents([all_chunks[0]])
+        dimension = np.array(first_embedding).shape[1]
+
+        # 2. Create an IndexIVFFlat index
+        nlist = 1024  # Number of clusters
+        quantizer = faiss.IndexFlatL2(dimension)
+        index = faiss.IndexIVFFlat(quantizer, dimension, nlist)
+
+        # 3. Train the index on a subset of the data
+        print(f"  - Training index on a sample of {min(len(all_chunks), 256 * nlist)} vectors...")
+        # FAISS recommends training on 30x to 256x the number of clusters
+        num_train_vectors = min(len(all_chunks), 256 * nlist)
+        train_indices = np.random.choice(len(all_chunks), num_train_vectors, replace=False)
+
+        # Generate embeddings only for the training set
+        train_chunks = [all_chunks[i] for i in train_indices]
+        train_embeddings = vectorizer.embed_documents(train_chunks)
+        train_embeddings_np = np.array(train_embeddings, dtype='float32')
+
+        index.train(train_embeddings_np)
+        print("  - Index training complete.")
+
+        # 4. Add all vectors to the index in batches
+        batch_size = 16384
+
+        for i in tqdm(range(0, len(all_chunks), batch_size), desc="Indexing Batches"):
+            batch_chunks = all_chunks[i:i + batch_size]
+            if not batch_chunks:
+                continue
+
+            batch_embeddings = vectorizer.embed_documents(batch_chunks)
+            batch_embeddings_np = np.array(batch_embeddings, dtype='float32')
+            index.add(batch_embeddings_np)
+
+        print(f"  - FAISS index built with {index.ntotal} vectors.")
 
         index_path = os.path.join(output_dir, "index.faiss")
         faiss.write_index(index, index_path)
@@ -141,4 +175,7 @@ if __name__ == "__main__":
         help="Path to the experiment config JSON file (e.g., configs/base_experiment.json).",
     )
     args = parser.parse_args()
+
+    print(f"--- Execution started at: {datetime.now()} ---")
     main(config_path=args.config)
+    print(f"--- Execution finished at: {datetime.now()} ---")
