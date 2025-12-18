@@ -28,14 +28,23 @@ class ExperimentRunner:
         results_handler: ResultsHandler,
         top_k: int,
         embedding_model_name: str,
+        difficulty: str | None = None,
     ) -> None:
         self.experiments: list[dict[str, Any]] = experiments
-        self.dataset: list[dict[str, Any]] = dataset
         self.vectorizer: Vectorizer = vectorizer
         self.retriever: FaissRetriever = retriever
         self.results_handler: ResultsHandler = results_handler
         self.top_k: int = top_k
         self.embedding_model_name: str = embedding_model_name
+
+        if difficulty:
+            print(f"Filtering dataset for difficulty: {difficulty}")
+            self.dataset: list[dict[str, Any]] = [
+                d for d in dataset if d.get("difficulty") == difficulty
+            ]
+            print(f"Filtered dataset size: {len(self.dataset)} (Original: {len(dataset)})")
+        else:
+            self.dataset: list[dict[str, Any]] = dataset
 
     def _get_index_paths(self, experiment_name: str) -> tuple[str, str]:
         index_folder_name: str = create_index_name(experiment_name, self.embedding_model_name)

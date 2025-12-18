@@ -29,8 +29,11 @@ class DatasetCategorizer:
 
     def _build_categorization_prompt(self, question: str) -> str:
         return (
-            f"Categorize the following question into one of these categories and difficulties:\n"
-            f"Categories: Factoid, Inference, Multihop\n"
+            f"Categorize the following question into one of these categories and difficulties:\n\n"
+            f"Categories:\n"
+            f"- Factoid: Questions asking for specific facts, entities, dates, or numbers. Answerable with a single piece of information.\n"
+            f"- Inference: Questions requiring reasoning, deduction, or combining information from a single context to reach a conclusion.\n"
+            f"- Multihop: Questions requiring information from multiple distinct parts of a text or multiple documents to answer.\n\n"
             f"Difficulties: Easy, Moderate, Hard\n\n"
             f"Question: {question}\n\n"
             f"Respond in the format: Category | Difficulty\n"

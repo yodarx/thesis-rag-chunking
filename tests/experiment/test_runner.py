@@ -123,3 +123,41 @@ def test_run_all_loop(mock_metrics, mock_deps, sample_experiment, sample_dataset
     mock_results.create_and_save_summary.assert_called_once_with(mock_detailed_df)
     mock_results.display_summary.assert_called_once_with(mock_summary_df)
     assert summary.equals(mock_summary_df)  # Check returned summary
+
+
+def test_runner_difficulty_filtering(mock_deps, sample_experiment):
+    """Tests that the runner correctly filters the dataset by difficulty."""
+    dataset = [
+        {"sample_id": "1", "difficulty": "Easy", "question": "Q1", "gold_passages": []},
+        {"sample_id": "2", "difficulty": "Hard", "question": "Q2", "gold_passages": []},
+        {"sample_id": "3", "difficulty": "Easy", "question": "Q3", "gold_passages": []},
+    ]
+
+    # Initialize runner with difficulty filter
+    runner = ExperimentRunner(
+        experiments=[sample_experiment],
+        dataset=dataset,
+        vectorizer=mock_deps["vectorizer"],
+        retriever=mock_deps["retriever"],
+        results_handler=mock_deps["results_handler"],
+        top_k=1,
+        embedding_model_name="test-model",
+        difficulty="Hard",
+    )
+
+    assert len(runner.dataset) == 1
+    assert runner.dataset[0]["sample_id"] == "2"
+    assert runner.dataset[0]["difficulty"] == "Hard"
+
+    # Initialize runner without filter
+    runner_all = ExperimentRunner(
+        experiments=[sample_experiment],
+        dataset=dataset,
+        vectorizer=mock_deps["vectorizer"],
+        retriever=mock_deps["retriever"],
+        results_handler=mock_deps["results_handler"],
+        top_k=1,
+        embedding_model_name="test-model",
+    )
+
+    assert len(runner_all.dataset) == 3

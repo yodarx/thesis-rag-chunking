@@ -173,6 +173,13 @@ Use the `--silver` flag to run in Silver Standard mode. This mode:
 python run.py --config-json configs/0_base_experiment.json --silver
 ```
 
+**Filtering by Difficulty:**
+You can filter the dataset by difficulty (e.g., "Hard", "Medium", "Easy") using the `--difficulty` flag. This works for both Gold and Silver modes, provided the dataset contains a `difficulty` field.
+
+```bash
+python run.py --config-json configs/0_base_experiment.json --difficulty Hard
+```
+
 *Note: This ensures that each chunking strategy is evaluated against questions generated from its own chunks.*
 
 ## 6. Results

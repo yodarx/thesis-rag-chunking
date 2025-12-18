@@ -34,7 +34,11 @@ def load_config(json_path: str) -> dict[str, Any]:
 
 
 def run_experiments(
-    config: dict[str, Any], output_dir: str, timestamp: str, use_silver: bool = False
+    config: dict[str, Any],
+    output_dir: str,
+    timestamp: str,
+    use_silver: bool = False,
+    difficulty: str | None = None,
 ) -> None:
     retriever_type = config.get("retriever_type", "faiss")
     vectorizer: Vectorizer = Vectorizer.from_model_name(config["embedding_model"])
@@ -86,6 +90,7 @@ def run_experiments(
                 results_handler,
                 config["top_k"],
                 config["embedding_model"],
+                difficulty=difficulty,
             )
             runner.run_all()
 
@@ -99,6 +104,7 @@ def run_experiments(
             results_handler,
             config["top_k"],
             config["embedding_model"],
+            difficulty=difficulty,
         )
         summary_df = runner.run_all()
         if not summary_df.empty:
@@ -107,7 +113,7 @@ def run_experiments(
             print("No summary DataFrame to visualize.")
 
 
-def main(config_json: str = None, use_silver: bool = False) -> None:
+def main(config_json: str = None, use_silver: bool = False, difficulty: str | None = None) -> None:
     # Load config first to determine run type
     config = load_config(config_json)
     input_file = config.get("input_file", "")
@@ -118,6 +124,9 @@ def main(config_json: str = None, use_silver: bool = False) -> None:
     elif "gold" in input_file.lower():
         suffix = "gold"
 
+    if difficulty:
+        suffix = f"{suffix}_{difficulty}" if suffix else difficulty
+
     output_dir, timestamp = create_output_directory(suffix)
 
     # Copy config file to results directory
@@ -126,7 +135,7 @@ def main(config_json: str = None, use_silver: bool = False) -> None:
     shutil.copy(config_json, dest_path)
 
     # Pass loaded config to avoid reloading
-    run_experiments(config, output_dir, timestamp, use_silver=use_silver)
+    run_experiments(config, output_dir, timestamp, use_silver=use_silver, difficulty=difficulty)
 
 
 def cli_entry() -> None:
@@ -144,8 +153,13 @@ def cli_entry() -> None:
         action="store_true",
         help="Run in Silver Standard mode (auto-generate/use per-experiment silver datasets)",
     )
+    parser.add_argument(
+        "--difficulty",
+        type=str,
+        help="Filter dataset by difficulty (e.g., 'Hard', 'Medium', 'Easy')",
+    )
     args = parser.parse_args()
-    main(args.config_json, use_silver=args.silver)
+    main(args.config_json, use_silver=args.silver, difficulty=args.difficulty)
 
 
 if __name__ == "__main__":
