@@ -1,4 +1,5 @@
 import json
+import uuid
 from typing import Any
 
 from langchain_community.llms import Ollama
@@ -49,7 +50,13 @@ class DatasetCategorizer:
 def load_asqa_dataset(filepath: str | None, limit: int | None = None) -> list[dict[str, Any]]:
     try:
         with open(filepath, encoding="utf-8") as f:
-            all_data: list[dict[str, Any]] = [json.loads(line) for line in f]
+            all_data: list[dict[str, Any]] = []
+            for line in f:
+                data = json.loads(line)
+                # Ensure sample_id exists
+                if "sample_id" not in data:
+                    data["sample_id"] = data.get("id", str(uuid.uuid4()))
+                all_data.append(data)
 
         return all_data[:limit] if limit else all_data
     except FileNotFoundError:

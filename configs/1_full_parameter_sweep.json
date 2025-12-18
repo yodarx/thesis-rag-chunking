@@ -3,36 +3,210 @@
   "retriever_type": "faiss",
   "top_k": 5,
   "input_file": "data/preprocessed/preprocessed_2025-11-03_all.jsonl",
+  "silver_limit": 10,
+  "llm_model": "gpt-oss",
+  "hops_count": 2,
   "experiments": [
-    { "name": "fixed_128_12", "function": "chunk_fixed_size", "params": {"chunk_size": 128, "chunk_overlap": 12} },
-    { "name": "fixed_256_25", "function": "chunk_fixed_size", "params": {"chunk_size": 256, "chunk_overlap": 25} },
-    { "name": "fixed_512_50", "function": "chunk_fixed_size", "params": {"chunk_size": 512, "chunk_overlap": 50} },
-    { "name": "fixed_768_75", "function": "chunk_fixed_size", "params": {"chunk_size": 768, "chunk_overlap": 75} },
-    { "name": "fixed_1024_100", "function": "chunk_fixed_size", "params": {"chunk_size": 1024, "chunk_overlap": 100} },
-    { "name": "fixed_512_0", "function": "chunk_fixed_size", "params": {"chunk_size": 512, "chunk_overlap": 0} },
-    { "name": "fixed_512_128", "function": "chunk_fixed_size", "params": {"chunk_size": 512, "chunk_overlap": 128} },
-    { "name": "fixed_512_256", "function": "chunk_fixed_size", "params": {"chunk_size": 512, "chunk_overlap": 256} },
-    { "name": "recursive_128_12", "function": "chunk_recursive", "params": {"chunk_size": 128, "chunk_overlap": 12} },
-    { "name": "recursive_256_25", "function": "chunk_recursive", "params": {"chunk_size": 256, "chunk_overlap": 25} },
-    { "name": "recursive_512_50", "function": "chunk_recursive", "params": {"chunk_size": 512, "chunk_overlap": 50} },
-    { "name": "recursive_768_75", "function": "chunk_recursive", "params": {"chunk_size": 768, "chunk_overlap": 75} },
-    { "name": "recursive_1024_100", "function": "chunk_recursive", "params": {"chunk_size": 1024, "chunk_overlap": 100} },
-    { "name": "recursive_512_0", "function": "chunk_recursive", "params": {"chunk_size": 512, "chunk_overlap": 0} },
-    { "name": "recursive_512_128", "function": "chunk_recursive", "params": {"chunk_size": 512, "chunk_overlap": 128} },
-    { "name": "recursive_512_256", "function": "chunk_recursive", "params": {"chunk_size": 512, "chunk_overlap": 256} },
-    { "name": "sentence_s1", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 1} },
-    { "name": "sentence_s2", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 2} },
-    { "name": "sentence_s3", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 3} },
-    { "name": "sentence_s5", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 5} },
-    { "name": "sentence_s7", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 7} },
-    { "name": "sentence_s10", "function": "chunk_by_sentence", "params": {"sentences_per_chunk": 10} },
+    {
+      "name": "fixed_128_12",
+      "function": "chunk_fixed_size",
+      "params": {
+        "chunk_size": 128,
+        "chunk_overlap": 12
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "fixed_256_25",
+      "function": "chunk_fixed_size",
+      "params": {
+        "chunk_size": 256,
+        "chunk_overlap": 25
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "fixed_512_50",
+      "function": "chunk_fixed_size",
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 50
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "fixed_768_75",
+      "function": "chunk_fixed_size",
+      "params": {
+        "chunk_size": 768,
+        "chunk_overlap": 75
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "fixed_1024_100",
+      "function": "chunk_fixed_size",
+      "params": {
+        "chunk_size": 1024,
+        "chunk_overlap": 100
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "fixed_512_0",
+      "function": "chunk_fixed_size",
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 0
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "fixed_512_128",
+      "function": "chunk_fixed_size",
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 128
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "fixed_512_256",
+      "function": "chunk_fixed_size",
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 256
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "recursive_128_12",
+      "function": "chunk_recursive",
+      "params": {
+        "chunk_size": 128,
+        "chunk_overlap": 12
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "recursive_256_25",
+      "function": "chunk_recursive",
+      "params": {
+        "chunk_size": 256,
+        "chunk_overlap": 25
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "recursive_512_50",
+      "function": "chunk_recursive",
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 50
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "recursive_768_75",
+      "function": "chunk_recursive",
+      "params": {
+        "chunk_size": 768,
+        "chunk_overlap": 75
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "recursive_1024_100",
+      "function": "chunk_recursive",
+      "params": {
+        "chunk_size": 1024,
+        "chunk_overlap": 100
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "recursive_512_0",
+      "function": "chunk_recursive",
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 0
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "recursive_512_128",
+      "function": "chunk_recursive",
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 128
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "recursive_512_256",
+      "function": "chunk_recursive",
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 256
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "sentence_s1",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 1
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "sentence_s2",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 2
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "sentence_s3",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 3
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "sentence_s5",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 5
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "sentence_s7",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 7
+      },
+      "input_silver_file": null
+    },
+    {
+      "name": "sentence_s10",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 10
+      },
+      "input_silver_file": null
+    },
     {
       "name": "semantic_t0.5_miniLM",
       "function": "chunk_semantic",
       "params": {
         "similarity_threshold": 0.5,
         "chunking_embeddings": "all-MiniLM-L6-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.6_miniLM",
@@ -40,7 +214,8 @@
       "params": {
         "similarity_threshold": 0.6,
         "chunking_embeddings": "all-MiniLM-L6-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.7_miniLM",
@@ -48,7 +223,8 @@
       "params": {
         "similarity_threshold": 0.7,
         "chunking_embeddings": "all-MiniLM-L6-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.75_miniLM",
@@ -56,7 +232,8 @@
       "params": {
         "similarity_threshold": 0.75,
         "chunking_embeddings": "all-MiniLM-L6-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.8_miniLM",
@@ -64,7 +241,8 @@
       "params": {
         "similarity_threshold": 0.8,
         "chunking_embeddings": "all-MiniLM-L6-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.85_miniLM",
@@ -72,7 +250,8 @@
       "params": {
         "similarity_threshold": 0.85,
         "chunking_embeddings": "all-MiniLM-L6-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.9_miniLM",
@@ -80,7 +259,8 @@
       "params": {
         "similarity_threshold": 0.9,
         "chunking_embeddings": "all-MiniLM-L6-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.95_miniLM",
@@ -88,7 +268,8 @@
       "params": {
         "similarity_threshold": 0.95,
         "chunking_embeddings": "all-MiniLM-L6-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.7_bge_base",
@@ -96,7 +277,8 @@
       "params": {
         "similarity_threshold": 0.7,
         "chunking_embeddings": "BAAI/bge-base-en-v1.5"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.75_bge_base",
@@ -104,7 +286,8 @@
       "params": {
         "similarity_threshold": 0.75,
         "chunking_embeddings": "BAAI/bge-base-en-v1.5"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.8_bge_base",
@@ -112,7 +295,8 @@
       "params": {
         "similarity_threshold": 0.8,
         "chunking_embeddings": "BAAI/bge-base-en-v1.5"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.85_bge_base",
@@ -120,7 +304,8 @@
       "params": {
         "similarity_threshold": 0.85,
         "chunking_embeddings": "BAAI/bge-base-en-v1.5"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.9_bge_base",
@@ -128,7 +313,8 @@
       "params": {
         "similarity_threshold": 0.9,
         "chunking_embeddings": "BAAI/bge-base-en-v1.5"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.7_bge_small",
@@ -136,7 +322,8 @@
       "params": {
         "similarity_threshold": 0.7,
         "chunking_embeddings": "BAAI/bge-small-en-v1.5"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.8_bge_small",
@@ -144,7 +331,8 @@
       "params": {
         "similarity_threshold": 0.8,
         "chunking_embeddings": "BAAI/bge-small-en-v1.5"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.85_bge_small",
@@ -152,7 +340,8 @@
       "params": {
         "similarity_threshold": 0.85,
         "chunking_embeddings": "BAAI/bge-small-en-v1.5"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.7_mpnet",
@@ -160,7 +349,8 @@
       "params": {
         "similarity_threshold": 0.7,
         "chunking_embeddings": "sentence-transformers/all-mpnet-base-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.8_mpnet",
@@ -168,7 +358,8 @@
       "params": {
         "similarity_threshold": 0.8,
         "chunking_embeddings": "sentence-transformers/all-mpnet-base-v2"
-      }
+      },
+      "input_silver_file": null
     },
     {
       "name": "semantic_t0.85_mpnet",
@@ -176,7 +367,8 @@
       "params": {
         "similarity_threshold": 0.85,
         "chunking_embeddings": "sentence-transformers/all-mpnet-base-v2"
-      }
+      },
+      "input_silver_file": null
     }
   ]
 }

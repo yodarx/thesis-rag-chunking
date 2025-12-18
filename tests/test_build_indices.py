@@ -1,7 +1,7 @@
 import json
+import shutil
 from pathlib import Path
 from unittest import mock
-import shutil
 
 import pytest
 
@@ -97,6 +97,7 @@ def test_build_indices_skips_if_index_exists(
     tmp_path: Path,
 ) -> None:
     import os
+
     # Setup mocks
     mock_load_data.return_value = [
         {"sample_id": "doc1", "document_text": "This is a test document."}
@@ -113,7 +114,7 @@ def test_build_indices_skips_if_index_exists(
     os.chdir(tmp_path)
     try:
         # Create dummy index files in the expected location
-        index_dir = Path("indices/fixed_test-model")
+        index_dir = Path("data/indices/fixed_test-model")
         index_dir.mkdir(parents=True, exist_ok=True)
         (index_dir / "index.faiss").write_text("dummy")
         (index_dir / "chunks.json").write_text("[]")
@@ -122,4 +123,4 @@ def test_build_indices_skips_if_index_exists(
         mock_write_index.assert_not_called()
     finally:
         os.chdir(old_cwd)
-        shutil.rmtree(tmp_path / "indices", ignore_errors=True)
+        shutil.rmtree(tmp_path / "data", ignore_errors=True)

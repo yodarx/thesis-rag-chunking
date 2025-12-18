@@ -19,7 +19,8 @@ class ResultsHandler:
         metrics: dict[str, float],
     ) -> None:
         record: dict[str, Any] = {
-            "sample_id": data_point["sample_id"],
+            "sample_id": data_point.get("sample_id", data_point.get("id", "unknown")),
+            "question": data_point.get("question", ""),
             "experiment": experiment_name,
             "chunking_time_s": chunking_time,
             "num_chunks": num_chunks,

@@ -24,23 +24,34 @@ def mock_jsonl_file(mocker: MockerFixture):
 
 def test_load_asqa_dataset_full(mock_jsonl_file):
     """Testet das Laden der gesamten Datei."""
-    mock_open, expected_data = mock_jsonl_file
+    mock_open, raw_data = mock_jsonl_file
 
     data = load_asqa_dataset("dummy/path.jsonl")
 
     mock_open.assert_called_once_with("dummy/path.jsonl", encoding="utf-8")
-    assert data == expected_data
+
+    # Verify data matches raw_data plus sample_id
+    assert len(data) == len(raw_data)
+    for i, item in enumerate(data):
+        assert item["id"] == raw_data[i]["id"]
+        assert item["text"] == raw_data[i]["text"]
+        assert item["question"] == raw_data[i]["question"]
+        assert item["sample_id"] == raw_data[i]["id"]
 
 
 def test_load_asqa_dataset_with_limit(mock_jsonl_file):
     """Testet, ob der 'limit'-Parameter funktioniert."""
-    mock_open, expected_data = mock_jsonl_file
+    mock_open, raw_data = mock_jsonl_file
 
     limit = 2
     data = load_asqa_dataset("dummy/path.jsonl", limit=limit)
 
     assert len(data) == limit
-    assert data == expected_data[:limit]
+    for i, item in enumerate(data):
+        assert item["id"] == raw_data[i]["id"]
+        assert item["text"] == raw_data[i]["text"]
+        assert item["question"] == raw_data[i]["question"]
+        assert item["sample_id"] == raw_data[i]["id"]
 
 
 def test_load_asqa_dataset_file_not_found(mocker: MockerFixture):

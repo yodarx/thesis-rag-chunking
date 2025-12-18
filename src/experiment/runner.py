@@ -39,7 +39,7 @@ class ExperimentRunner:
 
     def _get_index_paths(self, experiment_name: str) -> tuple[str, str]:
         index_folder_name: str = create_index_name(experiment_name, self.embedding_model_name)
-        index_dir: str = os.path.join("indices", index_folder_name)
+        index_dir: str = os.path.join("data", "indices", index_folder_name)
         index_path: str = os.path.join(index_dir, "index.faiss")
         chunks_path: str = os.path.join(index_dir, "chunks.json")
         return index_path, chunks_path

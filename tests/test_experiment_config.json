@@ -3,6 +3,9 @@
   "embedding_model": "test-model",
   "retriever_type": "faiss",
   "top_k": 5,
+  "silver_limit": 2,
+  "llm_model": "test-llm",
+  "hops_count": 2,
   "experiments": [
     {
       "name": "fixed",

@@ -74,7 +74,7 @@ def process_experiment(
 ) -> None:
     chunk_func: Callable[..., list[str]] = get_chunking_function(experiment["function"])
     index_dir: str = os.path.join(
-        "indices", create_index_name(experiment["name"], config["embedding_model"])
+        "data", "indices", create_index_name(experiment["name"], config["embedding_model"])
     )
     index_path = os.path.join(index_dir, "index.faiss")
     chunks_path = os.path.join(index_dir, "chunks.json")
