@@ -4,8 +4,6 @@ lint = "ruff check ."
 format = "ruff format ."
 lint_format_write = "ruff check . --fix && ruff format ."
 start = "python main.py"
-docker_build_dev = "bash docker/build-and-upload.sh dev"
-docker_build = "bash docker/build-and-upload.sh latest"
 
 [tool.pytest.ini_options]
 pythonpath = [

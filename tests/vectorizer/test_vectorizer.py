@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import torch
 from pytest_mock import MockerFixture
 from sentence_transformers import SentenceTransformer
 
@@ -108,6 +109,12 @@ def test_from_model_name_factory_method_gpu_selection(mocker: MockerFixture):
 
     # Case 2: GPU not available
     mocker.patch("torch.cuda.is_available", return_value=False)
+    # Also mock MPS to be unavailable, otherwise it might be selected on macOS
+    mocker.patch("torch.backends.mps.is_available", return_value=False)
+    # Also mock XPU to be unavailable
+    if hasattr(torch, "xpu"):
+        mocker.patch("torch.xpu.is_available", return_value=False)
+
     vectorizer_cpu = Vectorizer.from_model_name(model_name)
     mock_constructor.assert_called_with(model_name, device=None)
     assert vectorizer_cpu.model is mock_model_instance

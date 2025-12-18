@@ -1,2 +1,3 @@
 .idea/
 venv/
+/indices/fixed_test-model/chunks.json

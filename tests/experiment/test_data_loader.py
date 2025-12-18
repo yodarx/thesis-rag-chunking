@@ -10,9 +10,9 @@ from src.experiment.data_loader import load_asqa_dataset
 def mock_jsonl_file(mocker: MockerFixture):
     """Erstellt einen Mock für eine JSONL-Datei."""
     sample_data = [
-        {"id": 1, "text": "Zeile 1"},
-        {"id": 2, "text": "Zeile 2"},
-        {"id": 3, "text": "Zeile 3"},
+        {"id": 1, "text": "Zeile 1", "question": "Question 1"},
+        {"id": 2, "text": "Zeile 2", "question": "Question 2"},
+        {"id": 3, "text": "Zeile 3", "question": "Question 3"},
     ]
     # Konvertiere Dicts in JSON-Strings mit Zeilenumbruch
     mock_content = "\n".join([json.dumps(line) for line in sample_data])
