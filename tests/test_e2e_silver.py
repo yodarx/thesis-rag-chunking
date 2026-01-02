@@ -1,6 +1,6 @@
 import json
 import os
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import faiss
 import numpy as np
@@ -12,6 +12,15 @@ import run
 
 @pytest.fixture
 def e2e_setup(tmp_path):
+    # Setup documents input file first
+    input_file = tmp_path / "data" / "input.jsonl"
+    input_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(input_file, "w") as f:
+        f.write('{"text": "Document 1 with machine learning content"}\n')
+        f.write('{"text": "Document 2 with deep learning models"}\n')
+        f.write('{"text": "Document 3 with neural network architectures"}\n')
+        f.write('{"text": "Document 4 with AI applications"}\n')
+
     # Setup config
     config = {
         "embedding_model": "dummy-model",
@@ -19,7 +28,8 @@ def e2e_setup(tmp_path):
         "llm_model": "dummy-llm",
         "hops_count": 2,
         "top_k": 2,
-        "input_file": "placeholder",  # Will be updated in test
+        "input_file": str(input_file),
+        "silver_file": "data/silver/test_exp_dummy-model_silver.jsonl",
         "experiments": [
             {
                 "name": "test_exp",
@@ -63,19 +73,28 @@ def test_e2e_silver_pipeline(e2e_setup):
     """
     config_path, tmp_path = e2e_setup
 
-    # Mock Vectorizer and Ollama
+    # Mock Vectorizer and Google Gen AI Client
     # We patch Vectorizer in both modules because they have already imported it
     with (
         patch("build_silver.Vectorizer") as mock_vectorizer_build,
         patch("run.Vectorizer") as mock_vectorizer_run,
-        patch("build_silver.Ollama") as mock_ollama,
+        patch("build_silver.initialize_llm_client") as mock_llm_init,
         patch("run.create_output_directory") as mock_create_out,
     ):
-        # Setup Mock LLM response
-        mock_llm_instance = mock_ollama.return_value
-        mock_llm_instance.invoke.return_value = json.dumps(
-            {"question": "What is the combined meaning of these chunks?", "answer": "42"}
+        # Setup Mock Google Gen AI Client
+        mock_client_instance = Mock()
+        mock_llm_init.return_value = (mock_client_instance, "gemini")
+
+        mock_response = Mock()
+        mock_response.text = json.dumps(
+            {
+                "question": "What is the combined meaning of these chunks?",
+                "answer": "42",
+                "bridge_entity": "Entity",
+                "gold_snippets": ["Snippet 1", "Snippet 2"],
+            }
         )
+        mock_client_instance.models.generate_content.return_value = mock_response
 
         # Setup Mock Vectorizer
         # We want both build_silver and run to use a mock that behaves the same way
@@ -107,15 +126,8 @@ def test_e2e_silver_pipeline(e2e_setup):
             assert silver_path.exists(), "Output silver dataset file was not created"
 
             # --- Step 2: Run Experiment ---
-            # Update config to use the generated silver file
-            with open(config_path) as f:
-                config = json.load(f)
-            config["input_file"] = str(silver_path)
-            with open(config_path, "w") as f:
-                json.dump(config, f)
-
-            # Run the experiment runner
-            run.main(str(config_path))
+            # The config already has silver_file set, so we just run with use_silver=True
+            run.main(str(config_path), use_silver=True)
 
             # Verify results
             # Should have created a summary CSV

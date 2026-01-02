@@ -5,7 +5,8 @@ This project provides a framework for evaluating different chunking strategies i
 ## Prerequisites
 
 *   **Python 3.12** (Required)
-*   **Ollama** (For LLM-based categorization and silver standard generation)
+*   **Google API Key** (For silver standard generation with Gemini 3 Pro)
+*   **Ollama** (Optional - only for LLM-based categorization if needed)
 
 ## 1. Environment Setup
 
@@ -38,19 +39,65 @@ py -3.12 -m venv venv
 pip install -r requirements.txt
 ```
 
-## 2. Ollama Setup
+## 2. Google Gemini API Setup
 
-This project uses [Ollama](https://ollama.com/) to run local LLMs for data categorization and generating synthetic "silver standard" datasets.
+This project uses **Google's Gemini 3 Pro** model to generate synthetic "silver standard" datasets. 
 
-1.  **Install Ollama**: Download and install from [ollama.com](https://ollama.com/).
-2.  **Start Ollama**: Run the application.
-3.  **Pull the Model**: The default configuration uses `gpt-oss` (or whichever model you configure). You can pull a model like `llama3` or `mistral` and update your config, or use the one specified.
+### 2.1. Get Your API Key
 
+1.  **Visit Google AI Studio**: Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2.  **Create/Copy API Key**: Click "Create API key" or copy an existing one
+3.  **Set Environment Variable**: Store the key securely in your shell environment
+
+**macOS / Linux:**
+```bash
+export GEMINI_API_KEY='your-api-key-here'
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:GEMINI_API_KEY='your-api-key-here'
+```
+
+**Windows (CMD):**
+```cmd
+set GEMINI_API_KEY=your-api-key-here
+```
+
+### 2.2. Verify Setup
+
+Test your API key:
+```bash
+python -c "from google import genai; client = genai.Client(); print('✓ Gemini API is configured correctly')"
+```
+
+### 2.3. Alternative: Vertex AI
+
+If you prefer to use **Google Cloud Vertex AI** instead:
+
+```bash
+# Set environment variables
+export GOOGLE_GENAI_USE_VERTEXAI=true
+export GOOGLE_CLOUD_PROJECT='your-project-id'
+export GOOGLE_CLOUD_LOCATION='us-central1'
+
+# The code will automatically use Vertex AI
+python build_silver.py configs/0_base_experiment.json
+```
+
+---
+
+## 2.4. Ollama (Optional - For Categorization Only)
+
+If you need to run the optional categorization step, you'll need Ollama:
+
+1.  **Install Ollama**: Download from [ollama.com](https://ollama.com/)
+2.  **Start Ollama**: Run the application
+3.  **Pull a Model**: 
     ```bash
     ollama pull llama3
-    ollama pull qwen2.5:14b
     ```
-    *(Note: Ensure the `llm_model` in your config files matches the model you pulled, e.g., "llama3")*
+4.  **Update Config**: Set `llm_model` in your config file to match the model you pulled
 
 ## 3. Development Workflow
 
@@ -104,25 +151,84 @@ python build_indices.py configs/0_base_experiment.json
 
 ### 4.4. Generating Silver Standard
 
-Creates a synthetic evaluation dataset (Question-Answer pairs) from your chunks using an LLM. This is useful for "Silver Standard" evaluation.
+Creates a synthetic evaluation dataset (Question-Answer pairs) from your chunks using **Gemini 3 Pro**. This is useful for "Silver Standard" evaluation when human-annotated gold standard data is unavailable.
 
-**Note:** You can skip this step if you use the `--silver` flag with `run.py`, as it will automatically generate missing silver datasets for each experiment.
+**Prerequisites:**
+- Gemini API key set in environment (see Section 2.1)
+- Chunks already indexed (from `build_indices.py`)
 
-*   **Limit**: Controls how many samples to generate.
-    *   `10`: Generates 10 samples (good for testing).
-    *   `-1`: Generates samples for ALL chunks.
-*   **Hops**: Configures multi-hop question generation (default 2 chunks).
-
+**Command:**
 ```bash
-# Run with config settings
 python build_silver.py configs/0_base_experiment.json
-
-
-# Override limit via CLI (e.g., generate for all chunks)
-python build_silver.py configs/0_base_experiment.json --limit -1
 ```
 
-The generated dataset is saved to `data/silver/`.
+**Configuration:**
+
+The following settings in your config JSON control silver standard generation:
+
+```json
+{
+  "silver_limit": 2,      // How many Q&A pairs to generate per experiment
+  "hops_count": 2,        // Multi-hop depth (how many chunks to use)
+  "embedding_model": "all-MiniLM-L6-v2"  // For context retrieval
+}
+```
+
+| Setting | Values | Default | Purpose |
+|---------|--------|---------|---------|
+| `silver_limit` | `-1` or positive int | `10` | `-1`: Generate for ALL chunks. Positive number: Generate exactly that many samples. |
+| `hops_count` | Positive int | `2` | Number of chunks to use for multi-hop question generation. Higher = more complex questions. |
+| `embedding_model` | Any HuggingFace model | `all-MiniLM-L6-v2` | Used to select relevant context chunks. |
+
+**Example Usage:**
+
+```bash
+# Generate 5 samples per experiment
+python build_silver.py configs/0_base_experiment.json
+
+# Generate for ALL chunks (set silver_limit: -1 in config, then run)
+python build_silver.py configs/0_base_experiment.json
+```
+
+**How It Works:**
+
+For each experiment in your config:
+1. Loads pre-chunked documenets from `data/indices/{experiment_name}_{embedding_model}/chunks.json`
+2. For each sample:
+   - Randomly selects `hops_count` chunks as context
+   - Sends them to **Gemini 3 Pro** to generate a multi-hop question
+   - Extracts the answer from the provided context
+3. Saves Q&A pairs to `data/silver/{experiment_name}_{embedding_model}_silver.jsonl`
+
+**Output Format:**
+
+Each line in the output JSONL file:
+```json
+{
+  "sample_id": "uuid",
+  "question": "Generated question",
+  "answer": "Extracted answer",
+  "gold_passages": ["chunk1", "chunk2"],
+  "category": "Multihop",
+  "difficulty": "Hard"
+}
+```
+
+**Important Notes:**
+
+- ✅ **Idempotent**: Won't regenerate if the output file already exists (delete to regenerate)
+- ✅ **API Efficient**: Uses Gemini 3 Pro's efficient API - verify your quota at [Google AI Console](https://aistudio.google.com/app/apikey)
+- ✅ **Error Handling**: Continues processing even if some samples fail; retries up to 10x per sample
+- ✅ **Progress Tracking**: Prints status for each experiment
+
+**Troubleshooting:**
+
+| Problem | Solution |
+|---------|----------|
+| `ImportError: cannot import name 'genai'` | Run `pip install -r requirements.txt` to install google-genai |
+| `APIError: 401 Unauthorized` | Verify API key: `echo $GEMINI_API_KEY` |
+| `Chunks file not found` | Run `python build_indices.py configs/0_base_experiment.json` first |
+| High failure rate in output | Check your chunks are > 100 characters; increase `silver_limit` for more attempts |
 
 ## 5. Running Experiments
 
@@ -157,28 +263,66 @@ Experiments are defined in JSON files located in `configs/`.
 
 To run an experiment, point `run.py` to a config file.
 
-**For Gold Standard:**
+#### **Gold Standard Evaluation**
+
+Evaluates against human-annotated, high-quality data.
 Ensure `input_file` in the config points to your gold standard dataset.
 
 ```bash
 python run.py --config-json configs/0_base_experiment.json
 ```
 
-**For Silver Standard:**
-Use the `--silver` flag to run in Silver Standard mode. This mode:
-1.  Automatically generates a silver dataset for each experiment (if one doesn't exist).
-2.  Uses the generated dataset to evaluate that specific experiment.
-3.  Allows overriding the dataset via `input_silver_file` in the experiment config.
+**Use case**: Comprehensive evaluation with reliable ground truth
+
+---
+
+#### **Silver Standard Evaluation (Using Gemini)**
+
+Evaluates against synthetic data generated by **Gemini 3 Pro**. This mode:
+1. **Automatically generates** a silver dataset for each experiment (if one doesn't exist)
+2. **Uses Gemini 3 Pro** to generate multi-hop Q&A pairs from chunks
+3. **Evaluates each chunking strategy** against its own generated questions
+4. Allows overriding the dataset via `input_silver_file` in the experiment config
 
 ```bash
+# Enable Silver Standard mode
 python run.py --config-json configs/0_base_experiment.json --silver
 ```
 
-**Filtering by Difficulty:**
-You can filter the dataset by difficulty (e.g., "Hard", "Medium", "Easy") using the `--difficulty` flag. This works for both Gold and Silver modes, provided the dataset contains a `difficulty` field.
+**Prerequisites:**
+- Gemini API key configured (see Section 2)
+- Indices built via `build_silver.py` or `build_indices.py`
+
+**How it works:**
+- For each experiment, Gemini generates questions from that experiment's chunks
+- Since questions are tailored to the chunking strategy, results reflect how well that chunking preserves retrievability
+- Useful for rapid prototyping and parameter sensitivity studies
+
+**Use case**: Efficient experimentation without human annotation
+
+---
+
+#### **Difficulty Filtering**
+
+Filter the dataset by difficulty (e.g., "Hard", "Medium", "Easy") using the `--difficulty` flag. This works for both Gold and Silver modes, provided the dataset contains a `difficulty` field.
 
 ```bash
 python run.py --config-json configs/0_base_experiment.json --difficulty Hard
+```
+
+**Example Workflow:**
+
+```bash
+# 1. Build indices for all chunking strategies
+python build_indices.py configs/0_base_experiment.json
+
+# 2. Generate silver standard questions (Gemini-powered)
+python build_silver.py configs/0_base_experiment.json
+
+# 3. Run experiments against silver standard
+python run.py --config-json configs/0_base_experiment.json --silver
+
+# 4. Compare results in results/{timestamp}/ folder
 ```
 
 *Note: This ensures that each chunking strategy is evaluated against questions generated from its own chunks.*

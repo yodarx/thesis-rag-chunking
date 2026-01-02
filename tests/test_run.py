@@ -108,13 +108,13 @@ def test_run_main_gold_suffix(mock_dependencies, mocker):
     mock_dependencies["create_dir"].assert_called_once_with("gold")
 
 
-def test_run_main_silver_flag_with_input_file(mock_dependencies, mocker):
-    """Test that --silver flag uses input_silver_file if provided in experiment config."""
+def test_run_main_silver_flag(mock_dependencies, mocker):
+    """Test that --silver flag uses the global silver_file from config."""
     with open(config_path) as f:
         config_data = json.load(f)
 
-    # Add input_silver_file to the first experiment
-    config_data["experiments"][0]["input_silver_file"] = "custom_silver.jsonl"
+    # Add silver_file to config (at root level)
+    config_data["silver_file"] = "data/silver/test_silver.jsonl"
 
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
     mocker.patch("json.load", return_value=config_data)
@@ -124,37 +124,9 @@ def test_run_main_silver_flag_with_input_file(mock_dependencies, mocker):
     run.main(config_json=config_path, use_silver=True)
 
     mock_dependencies["create_dir"].assert_called_once_with("silver")
-    # Should load data from the custom path
+    # Should load data from the global silver_file
     mock_dependencies["load_data"].assert_called_with(
-        "custom_silver.jsonl", config_data.get("limit")
-    )
-
-
-def test_run_main_silver_flag(mock_dependencies, mocker):
-    """Test that --silver flag triggers silver generation logic."""
-    with open(config_path) as f:
-        config_data = json.load(f)
-    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
-    mocker.patch("json.load", return_value=config_data)
-    mocker.patch("shutil.copy")
-
-    # Mock os.path.exists to simulate silver file existence
-    # We need to save the original function because we might need it (though mostly mocked out)
-    # But simpler: just return True for our target file, False for others (or rely on mocks)
-    # Since create_output_directory is mocked, and shutil.copy is mocked, we mostly care about the silver check.
-    def exists_side_effect(path):
-        return "fixed_test-model_silver.jsonl" in str(path)
-
-    mocker.patch("os.path.exists", side_effect=exists_side_effect)
-
-    run.main(config_json=config_path, use_silver=True)
-
-    mock_dependencies["create_dir"].assert_called_once_with("silver")
-
-    # Should load data from the expected silver path
-    expected_silver_path = os.path.join("data", "silver", "fixed_test-model_silver.jsonl")
-    mock_dependencies["load_data"].assert_called_with(
-        expected_silver_path, config_data.get("limit")
+        "data/silver/test_silver.jsonl", config_data.get("limit")
     )
 
 

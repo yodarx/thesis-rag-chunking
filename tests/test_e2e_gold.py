@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 from unittest.mock import patch
 
@@ -17,6 +16,7 @@ def e2e_gold_setup(tmp_path):
         "embedding_model": "dummy-model",
         "top_k": 2,
         "input_file": "placeholder",  # Will be updated in test
+        "silver_file": "data/silver/test_exp_dummy-model_silver.jsonl",
         "experiments": [
             {
                 "name": "test_exp",
@@ -129,8 +129,8 @@ def test_e2e_gold_pipeline(e2e_gold_setup):
 
 def test_e2e_silver_missing_file_warning(e2e_gold_setup, caplog):
     """
-    Test that if silver file is missing, we warn and continue (skip generation),
-    instead of auto-generating.
+    Test that if silver file is missing, we handle it gracefully
+    by printing an error message and returning.
     """
     config_path, tmp_path = e2e_gold_setup
 
@@ -149,20 +149,24 @@ def test_e2e_silver_missing_file_warning(e2e_gold_setup, caplog):
         cwd = os.getcwd()
         os.chdir(tmp_path)
         try:
-            # Capture logs
-            with caplog.at_level(logging.WARNING):
-                # Run main with config path AND use_silver=True
-                run.main(str(config_path), use_silver=True)
+            # Capture both stdout and logs
+            import io
+            import sys
 
-            # Assert warning was logged
-            # We expect a warning indicating the file was not found and/or skipping
-            assert any(
-                "silver" in r.message.lower()
-                and ("missing" in r.message.lower() or "not found" in r.message.lower())
-                for r in caplog.records
-            )
+            captured_output = io.StringIO()
+            old_stdout = sys.stdout
+            sys.stdout = captured_output
 
-            # Assert file was NOT created (auto-generation skipped)
+            # Run main with config path AND use_silver=True
+            run.main(str(config_path), use_silver=True)
+
+            sys.stdout = old_stdout
+            output = captured_output.getvalue()
+
+            # Assert error message was printed about missing silver file
+            assert "Error: Silver file not found" in output or "not found" in output.lower()
+
+            # Assert file was NOT created
             assert not silver_path.exists()
         finally:
             os.chdir(cwd)

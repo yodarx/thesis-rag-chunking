@@ -4,6 +4,7 @@
   "retriever_type": "faiss",
   "top_k": 5,
   "silver_limit": 2,
+  "silver_file": "data/silver/test_silver.jsonl",
   "llm_model": "test-llm",
   "hops_count": 2,
   "experiments": [

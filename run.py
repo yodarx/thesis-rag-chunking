@@ -1,6 +1,5 @@
 import argparse
 import json
-import logging
 import os
 import shutil
 import sys
@@ -11,7 +10,6 @@ from src.experiment.data_loader import load_asqa_dataset
 from src.experiment.results import ResultsHandler
 from src.experiment.retriever import FaissRetriever
 from src.experiment.runner import ExperimentRunner
-from src.experiment.utils import create_index_name
 from src.plotting.plotting import visualize_and_save_results
 from src.vectorizer.vectorizer import Vectorizer
 
@@ -51,47 +49,34 @@ def run_experiments(
     results_handler: ResultsHandler = ResultsHandler(output_dir, timestamp)
 
     if use_silver:
-        print("Running in Silver Standard mode (per-experiment datasets)...")
+        print("Running in Silver Standard mode...")
 
-        for experiment in config["experiments"]:
-            # Check if a specific silver file is defined for this experiment
-            silver_path = experiment.get("input_silver_file")
+        # Use the single silver file from the global config
+        silver_path = config.get("silver_file")
 
-            if silver_path:
-                print(f"Using provided silver dataset for {experiment['name']}: {silver_path}")
-                if not os.path.exists(silver_path):
-                    print(f"Error: Provided silver file not found: {silver_path}")
-                    continue
-            else:
-                # 1. Check if silver dataset exists (do NOT auto-generate)
-                index_name = create_index_name(experiment["name"], config["embedding_model"])
-                silver_path = os.path.join("data", "silver", f"{index_name}_silver.jsonl")
+        if not silver_path:
+            print("Error: 'silver_file' not specified in config")
+            return
 
-                if not os.path.exists(silver_path):
-                    logging.warning(
-                        f"Silver dataset not found for {experiment['name']} at {silver_path}. Skipping."
-                    )
-                    silver_path = None
+        if not os.path.exists(silver_path):
+            print(f"Error: Silver file not found: {silver_path}")
+            return
 
-            if not silver_path:
-                print(f"Skipping experiment {experiment['name']} due to missing silver dataset.")
-                continue
+        print(f"Using silver dataset: {silver_path}")
+        dataset = load_asqa_dataset(silver_path, config.get("limit"))
 
-            # 2. Load specific dataset
-            dataset = load_asqa_dataset(silver_path, config.get("limit"))
-
-            # 3. Run experiment
-            runner = ExperimentRunner(
-                [experiment],  # Run only this experiment
-                dataset,
-                vectorizer,
-                retriever,
-                results_handler,
-                config["top_k"],
-                config["embedding_model"],
-                difficulty=difficulty,
-            )
-            runner.run_all()
+        # Run all experiments with the silver dataset
+        runner = ExperimentRunner(
+            config["experiments"],
+            dataset,
+            vectorizer,
+            retriever,
+            results_handler,
+            config["top_k"],
+            config["embedding_model"],
+            difficulty=difficulty,
+        )
+        runner.run_all()
 
     else:
         dataset = load_asqa_dataset(config["input_file"], config.get("limit"))
