@@ -2,7 +2,7 @@
   "embedding_model": "all-MiniLM-L6-v2",
   "retriever_type": "faiss",
   "top_k": 5,
-  "input_file": "data/preprocessed/preprocessed_2025-11-03_all.jsonl",
+  "input_file": "data/preprocessed/preprocessed_2025-11-03_all_categorized.jsonl",
   "silver_limit": 2,
   "llm_model": "phi3",
   "hops_count": 2,

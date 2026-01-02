@@ -21,8 +21,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 def create_output_directory(suffix: str = "") -> tuple[str, str]:
     timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     folder_name = f"{timestamp}_{suffix}" if suffix else timestamp
-    base_dir: str = "/workspace" if os.path.exists("/workspace") else "results"
-    output_dir: str = os.path.join(base_dir, "results", folder_name)
+    output_dir: str = os.path.join("results", folder_name)
     os.makedirs(output_dir, exist_ok=True)
     print(f"Results for this run will be saved in '{output_dir}'.")
     return output_dir, timestamp

@@ -3,7 +3,7 @@
   "retriever_type": "faiss",
   "top_k": 5,
   "log_matches": true,
-  "input_file": "data/preprocessed/preprocessed_2025-11-03_all.jsonl",
+  "input_file": "data/preprocessed/preprocessed_2025-11-03_all_categorized.jsonl",
   "silver_limit": 10,
   "llm_model": "gpt-oss",
   "hops_count": 2,

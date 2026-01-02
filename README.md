@@ -48,6 +48,7 @@ This project uses [Ollama](https://ollama.com/) to run local LLMs for data categ
 
     ```bash
     ollama pull llama3
+    ollama pull qwen2.5:14b
     ```
     *(Note: Ensure the `llm_model` in your config files matches the model you pulled, e.g., "llama3")*
 
