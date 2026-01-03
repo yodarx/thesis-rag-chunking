@@ -4,8 +4,6 @@ import re
 import uuid
 from typing import Any
 
-from src.experiment.retriever import FaissRetriever
-
 
 class SilverStandardGenerator:
     """
@@ -14,25 +12,16 @@ class SilverStandardGenerator:
     information from all selected articles.
     """
 
-    def __init__(self, retriever: FaissRetriever, llm_client: Any, llm_type: str = "gemini"):
+    def __init__(self, llm_client: Any, documents: list[str]):
         """
         Initialize the silver standard generator.
 
         Args:
-            retriever: FaissRetriever instance with chunks loaded
             llm_client: Either a Google genai.Client (for Gemini) or Ollama client
-            llm_type: "gemini" for Google Gemini API or "ollama" for local Ollama
-        """
-        self.retriever = retriever
+            documents: List of document texts to sample from"""
         self.llm_client = llm_client
-        self.llm_type = llm_type.lower()
-
-        if self.llm_type == "gemini":
-            self.model = "gemini-3.0-preview"
-        elif self.llm_type == "ollama":
-            self.model = None  # Ollama client handles model selection
-        else:
-            raise ValueError(f"Unsupported LLM type: {llm_type}. Use 'gemini' or 'ollama'.")
+        self.model = "gemini-3.0-preview"
+        self.documents = documents
 
     def generate_dataset(self, num_samples: int, num_hops: int = 3) -> list[dict[str, Any]]:
         """Generate a dataset of multi-hop QA pairs."""
@@ -58,9 +47,6 @@ class SilverStandardGenerator:
     def generate_sample(self, num_hops: int = 3) -> dict[str, Any] | None:
         """Generate a single multi-hop QA pair with evidence snippets."""
         try:
-            # 1. Get random raw contexts (e.g., full paragraphs or pages)
-            # Note: Ideally, these are NOT pre-chunked by your specific strategy,
-            # but are larger raw sections to allow for unbiased snippet extraction.
             chunks = self._get_random_contexts(n=num_hops)
 
             # 2. Build and send prompt
@@ -72,27 +58,22 @@ class SilverStandardGenerator:
             answer = qa_data.get("answer", "")
             gold_snippets = qa_data.get("gold_snippets", [])
 
-            # 3. Check for failure conditions
             if (
-                question == "IMPOSSIBLE"
-                or answer == "IMPOSSIBLE"
-                or question == "Error parsing generation"
-                or not gold_snippets  # Fail if no evidence was extracted
+                    question == "IMPOSSIBLE"
+                    or answer == "IMPOSSIBLE"
+                    or question == "Error parsing generation"
+                    or not gold_snippets
             ):
                 return None
 
-            # 4. Return the valid sample
-            # We store 'gold_snippets' as 'gold_passages' because these are the
-            # actual Ground Truth texts required for evaluation.
             return {
                 "sample_id": str(uuid.uuid4()),
                 "question": question,
                 "answer": answer,
-                "gold_passages": gold_snippets,  # The specific sentences, not the random blocks
+                "gold_passages": gold_snippets,
                 "category": "Multihop",
                 "difficulty": "Hard",
                 "metadata": {
-                    # Optional: Store the original chunks if you want to debug later
                     "source_chunks": chunks,
                     "bridge_entity": qa_data.get("bridge_entity"),
                 },
@@ -102,27 +83,12 @@ class SilverStandardGenerator:
             return None
 
     def _get_random_contexts(self, n: int = 3, min_char_length: int = 100) -> list[str]:
-        """Randomly select n chunks from the dataset."""
-        if not self.retriever.chunks:
-            raise ValueError("Retriever has no chunks loaded.")
+        candidates = [doc for doc in self.documents if len(doc) >= min_char_length]
+        return random.sample(candidates, n) if len(candidates) >= n else candidates
 
-        # Simple random selection without semantic similarity
-        available_chunks = [
-            chunk for chunk in self.retriever.chunks if len(chunk) >= min_char_length
-        ]
-
-        if not available_chunks:
-            # Fallback: use all chunks if none meet length requirement
-            available_chunks = self.retriever.chunks
-
-        # Randomly select n chunks
-        selected_chunks = random.sample(available_chunks, min(n, len(available_chunks)))
-
-        return selected_chunks
-
-    def _build_multihop_prompt(self, chunks: list[str]) -> str:
+    def _build_multihop_prompt(self, contexts: list[str]) -> str:
         """Build the prompt for multi-hop question generation with strict bridge validation."""
-        context_text = "\n\n".join([f"Context {i + 1}: {chunk}" for i, chunk in enumerate(chunks)])
+        context_text = "\n\n".join([f"Context {i + 1}: {chunk}" for i, chunk in enumerate(contexts)])
 
         return (
             f"You are an expert at creating high-quality logical reasoning datasets. "
@@ -159,12 +125,7 @@ class SilverStandardGenerator:
 
     def _call_llm(self, prompt: str) -> str:
         """Call the LLM with the given prompt."""
-        if self.llm_type == "gemini":
-            return self._call_gemini(prompt)
-        elif self.llm_type == "ollama":
-            return self._call_ollama(prompt)
-        else:
-            raise ValueError(f"Unsupported LLM type: {self.llm_type}")
+        return self._call_gemini(prompt)
 
     def _call_gemini(self, prompt: str) -> str:
         """Call Google Gemini API."""
@@ -178,18 +139,8 @@ class SilverStandardGenerator:
             print(f"Error calling Gemini API: {e}")
             raise
 
-    def _call_ollama(self, prompt: str) -> str:
-        """Call local Ollama LLM."""
-        try:
-            response = self.llm_client.invoke(prompt)
-            return response
-        except Exception as e:
-            print(f"Error calling Ollama: {e}")
-            raise
-
     def _parse_llm_response(self, response: str) -> dict[str, str]:
         """Parse JSON response from LLM."""
-        # Remove markdown code blocks if present
         cleaned_response = re.sub(r"```json\s*|\s*```", "", response).strip()
         try:
             return json.loads(cleaned_response)
