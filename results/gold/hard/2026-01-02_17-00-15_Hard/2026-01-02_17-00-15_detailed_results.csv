@@ -1,0 +1,63 @@
+sample_id,question,experiment,chunking_time_s,num_chunks,mrr,map,ndcg_at_k,precision_at_k,recall_at_k,f1_score_at_k
+4987105805278487511,Bones who is the father of angela's baby?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-6593534685836250520,When did health care workers first use chlorine solution to decontaminate hands?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+163584850516751107,Who sings you put the lime in the coconut?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+357726708731665296,Who sings you say it best when you say nothing at all?,fixed_128_12,0,5414625,0.5,0.5333333333333333,0.6797310500037655,0.6,0.2727272727272727,0.37499999999999994
+-4822789605010746268,In 1911 congress decided to fix the size of the house at?,fixed_128_12,0,5414625,1.0,1.0,1.0,1.0,2.5,1.4285714285714286
+-4900709700910146568,Who has won the last 10 world series?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-1014810535517666778,When did conflict start in israel and palestine?,fixed_128_12,0,5414625,1.0,1.0,1.0,0.4,0.6666666666666666,0.5
+1237920926774398276,When's the next time easter falls on april fools day?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+2269457951575222809,What movie was welcome home by radical face in?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-6926705067608220856,What led to the end of indus valley civilization?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+6113879938573233819,Who has the highest number of likes on instagram?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-3857791602197870808,Who becomes chief of police on the closer?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-6102374678194889758,List of highest runs in champion trophy 2017?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+2714015286907845703,Who is clara on when calls the heart?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-876253858162782258,Most amount of points scored in an nba game?,fixed_128_12,0,5414625,1.0,0.7555555555555555,0.8854598815714874,0.6,0.75,0.6666666666666665
+-8489723227411518336,Who wrote the assyrian came down like a wolf on the fold?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+3808058542574693217,How many variations of power rangers are there?,fixed_128_12,0,5414625,0.5,0.6388888888888888,0.7328286204777911,0.6,1.5,0.857142857142857
+-7249252321180320967,When was the last burning at the stake in england?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+4440863336369184746,Who had most of asia in its sphere of interest after the treaty of saragossa?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-4555140994124022586,When was the first altar built in the bible?,fixed_128_12,0,5414625,0.25,0.25,0.43067655807339306,0.2,0.5,0.28571428571428575
+7344113401182381737,Who won the 3 point contest last year?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+3579305903070298684,When did the 12 valve cummins come out?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+8920677267202726172,When was the last time miami won in foxboro?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-7430688674816652098,Who recorded this guys in love with you?,fixed_128_12,0,5414625,0.25,0.325,0.5012658353418871,0.4,0.3333333333333333,0.3636363636363636
+-5077669686985410335,Who hit the last home run at three rivers stadium?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+1563058980825104994,Who won the first nascar race at indy?,fixed_128_12,0,5414625,0.3333333333333333,0.3333333333333333,0.5,0.2,0.5,0.28571428571428575
+6023324052929614087,Who has the best winning percentage in nfl history?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-3562941926415682447,You're gonna miss me when i'm gone with cups?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-6812944997095026577,Who built the first zero turn lawn mower?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+5947334106839868987,Who won survivor heroes vs healers vs hustlers?,fixed_128_12,0,5414625,1.0,1.0,1.0,1.0,1.0,1.0
+-8985420883431850269,Number of movies released in india every year?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-629735412357919761,Who shot rick's son in the walking dead?,fixed_128_12,0,5414625,1.0,1.0,1.0,0.6,0.6,0.6
+1788376579913394563,Who used the word psychology for the first time?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+8643312430506346423,Who threw the overalls in mistress murphy's chowder?,fixed_128_12,0,5414625,1.0,0.95,0.9828920819566879,0.8,2.0,1.142857142857143
+-6595933575843520860,Who's winning the alabama clemson football game?,fixed_128_12,0,5414625,1.0,1.0,1.0,1.0,2.5,1.4285714285714286
+-1850565398832307454,What profile has the most followers on instagram?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+5020412065827011434,Who was eliminated on the voice december 12 2017?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-2421616108468028515,Who was the chairman of the opening and closing ceremonies at the 1960 winter olympics?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-7557360761999870489,Who has won the most old firm games?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-5498835325048231687,Who won the ladies roar of the rings?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+8004203303826747554,Who played in the 1998 afl grand final?,fixed_128_12,0,5414625,0.5,0.5833333333333333,0.6934264036172708,0.4,0.2222222222222222,0.2857142857142857
+4706336055008623881,When was the first government formed in the world?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-3567115157858987177,When does melinda tell sam she's jim?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+1582283260958361854,Who led investigation into the legality of apple’s accounting practices during the 2000s?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-7186473871494873250,Who has the best head to head record against serena williams?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+6939106340769221477,Recruited alex rogan video gamer to save the galaxy in the last starfighter?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+3670630515927162191,Who has the highest batting average in baseball today?,fixed_128_12,0,5414625,1.0,1.0,1.0,0.2,0.125,0.15384615384615385
+7775983008254057747,When was the first road to key west built?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-1325148824515450104,Who plays rebeccas boyfriend in the a word?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-6497990441806661535,What is the name of the restaurant that insults you?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+1242902672434324284,Everybody loves raymond robert dates 22 year old?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+8480092557592561766,When will the man who killed don quixote be released?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-8723650390763936267,What is the circulation of the globe and mail?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+3542376138806351681,What phenotype is associated with the genotype 47 xxy?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-6038783773377001158,When did jane and chris win the olympics?,fixed_128_12,0,5414625,0.3333333333333333,0.3333333333333333,0.5,0.2,0.5,0.28571428571428575
+-6007347717208405010,Why is there a moon on the outhouse door?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-3192820892937884675,Who is the winner of zumbo's just desserts?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+-8587207002552933804,Real world cast go big or go home?,fixed_128_12,0,5414625,0.2,0.2,0.38685280723454163,0.2,0.16666666666666666,0.1818181818181818
+1681931166694925579,When did they get rid of figures in figure skating?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+7391126470541357472,When do doug and carol get married in er?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
+3475080409674051393,What country has the lowest rate of homelessness?,fixed_128_12,0,5414625,0.25,0.25,0.43067655807339306,0.2,0.2,0.20000000000000004
+-1696066045378969622,Who sings what condition my condition is in?,fixed_128_12,0,5414625,0.0,0.0,0.0,0.0,0.0,0.0
