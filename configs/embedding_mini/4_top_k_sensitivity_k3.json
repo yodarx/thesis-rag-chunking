@@ -1,12 +1,10 @@
 {
   "embedding_model": "all-MiniLM-L6-v2",
   "retriever_type": "faiss",
-  "top_k": 5,
+  "top_k": 3,
   "input_file": "data/preprocessed/preprocessed_2025-11-03_all_categorized.jsonl",
-  "silver_limit": 1,
+  "silver_limit": 5,
   "silver_file": "data/silver/fixed_128_12_all-MiniLM-L6-v2_silver.jsonl",
-  "llm_model": "phi3",
-  "hops_count": 2,
   "experiments": [
     {
       "name": "fixed_512_50",

@@ -30,7 +30,7 @@ def initialize_llm_client() -> Any:
 
 
 def main(limit: int = 10) -> None:
-    print(f"Limit per experiment: {limit}")
+    print(f"Limit: {limit}")
 
     client = initialize_llm_client()
 
@@ -43,6 +43,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build silver standard datasets for experiments.")
     parser.add_argument(
         "--limit",
+        type=int,
         default=10,
         help="How many silver samples to generate per experiment (default: 10)",
     )
