@@ -230,3 +230,158 @@ def test_calculate_metrics_basic() -> None:
     metrics = calculate_metrics(retrieved_chunks, gold_passages, k=2)
     assert isinstance(metrics, dict)
     assert all(isinstance(v, float) for v in metrics.values())
+
+
+# --- Tests für Wortgrenzenerkennung (Word Boundary Matching) ---
+
+
+def test_word_boundary_exact_match_multi_word():
+    """Test-Szenario: Exakter Treffer (Mehrere Wörter)"""
+    retrieved_chunks = ["The climate change effects are visible."]
+    gold_passages = ["climate change"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Exakter Treffer sollte erkannt werden"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_prefix_mismatch():
+    """Test-Szenario: Teilwort-Falle (Präfix)"""
+    retrieved_chunks = ["The microclimate change is interesting."]
+    gold_passages = ["climate change"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(0.0), "'microclimate' sollte nicht mit 'climate change' matchen"
+    assert metrics["recall_at_k"] == pytest.approx(0.0)
+
+
+def test_word_boundary_suffix_mismatch():
+    """Test-Szenario: Teilwort-Falle (Suffix)"""
+    retrieved_chunks = ["Climate changes are natural."]
+    gold_passages = ["climate change"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(0.0), "'changes' sollte nicht mit 'climate change' matchen"
+    assert metrics["recall_at_k"] == pytest.approx(0.0)
+
+
+def test_word_boundary_substring_trap():
+    """Test-Szenario: Die Winter-Falle (Substring)"""
+    retrieved_chunks = ["Winter is coming."]
+    gold_passages = ["win"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(0.0), "'win' in 'Winter' sollte nicht matchen"
+    assert metrics["recall_at_k"] == pytest.approx(0.0)
+
+
+def test_word_boundary_punctuation_tolerance():
+    """Test-Szenario: Satzzeichen-Toleranz"""
+    retrieved_chunks = ["We want to win."]
+    gold_passages = ["win"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "'win' vor Punkt sollte matchen"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_parentheses_tolerance():
+    """Test-Szenario: Klammern"""
+    retrieved_chunks = ["The team (Manchester City) played well."]
+    gold_passages = ["Manchester City"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Text in Klammern sollte matchen"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_case_insensitive():
+    """Test-Szenario: Case-Insensitive Matching"""
+    retrieved_chunks = ["The CLIMATE CHANGE effects are visible."]
+    gold_passages = ["climate change"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Case-insensitive Match sollte funktionieren"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_flexible_whitespace():
+    """Test-Szenario: Flexible Whitespace"""
+    retrieved_chunks = ["The climate   change effects are visible."]  # Multiple spaces
+    gold_passages = ["climate change"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Mehrere Leerzeichen sollten matchen"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_special_characters():
+    """Test-Szenario: Spezialzeichen in Gold-Passagen"""
+    retrieved_chunks = ["The C++ programming language is powerful."]
+    gold_passages = ["C++"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Spezialzeichen sollten escaped und matched werden"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_single_word():
+    """Test-Szenario: Einzelnes Wort"""
+    retrieved_chunks = ["The climate is changing."]
+    gold_passages = ["climate"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Einzelnes Wort sollte matchen"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_no_match():
+    """Test-Szenario: Kein Match"""
+    retrieved_chunks = ["The weather is nice today."]
+    gold_passages = ["climate"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(0.0), "Nicht vorhandener Text sollte nicht matchen"
+    assert metrics["recall_at_k"] == pytest.approx(0.0)
+
+
+def test_word_boundary_hyphen_separated():
+    """Test-Szenario: Mit Bindestrich getrennte Wörter"""
+    retrieved_chunks = ["The well-known scientist gave a talk."]
+    gold_passages = ["well-known"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Bindestrich-getrennte Wörter sollten matchen"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_newline_killer():
+    """Test-Szenario: Der Zeilenumbruch-Killer"""
+    retrieved_chunks = ["The climate\nchange is real."]
+    gold_passages = ["climate change"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Zeilenumbruch zwischen Wörtern sollte matchen"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_double_space():
+    """Test-Szenario: Doppeltes Leerzeichen"""
+    retrieved_chunks = ["The climate  change is real."]  # Two spaces
+    gold_passages = ["climate change"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Mehrfache Leerzeichen sollten matchen"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+
+def test_word_boundary_tab_indentation():
+    """Test-Szenario: Tabulator / Einrückung"""
+    retrieved_chunks = ["The climate\tchange is real."]  # Tab character
+    gold_passages = ["climate change"]
+    metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
+
+    assert metrics["precision_at_k"] == pytest.approx(1.0), "Tabulator zwischen Wörtern sollte matchen"
+    assert metrics["recall_at_k"] == pytest.approx(1.0)
+
+

@@ -1,3 +1,4 @@
+import re
 from typing import NamedTuple
 
 import numpy as np
@@ -114,12 +115,25 @@ def calculate_f1_score_at_k(precision: float, recall: float) -> float:
 
 
 def _get_match_results(chunks_at_k: list[str], gold_passages: list[str]) -> list[MatchResult]:
-    """Erstellt eine Liste von Match-Ergebnissen für die Relevanzprüfung (case-insensitive substring match)."""
+    r"""
+    Erstellt eine Liste von Match-Ergebnissen für die Relevanzprüfung mit Wortgrenzen.
+
+    Nutzt Regex mit Wortgrenzen (\b) um zu verhindern, dass "win" in "winter" matched.
+    Erlaubt flexible Whitespace-Matches (\s+) zwischen Wörtern, inkl. Newlines, Tabs und mehrfache Leerzeichen.
+    """
     results = []
     for chunk in chunks_at_k:
         match = None
         for gold in gold_passages:
-            if gold.lower() in chunk.lower():
+            # Escape special regex characters
+            gold_lower = gold.lower()
+            safe_gold = re.escape(gold_lower)
+            # Replace escaped spaces with flexible whitespace pattern (\s+ matches any whitespace including newlines, tabs)
+            flexible_gold = safe_gold.replace(r"\ ", r"\s+")
+            # Build pattern with word boundaries
+            pattern = r"(?<!\w)" + flexible_gold + r"(?!\w)"
+
+            if re.search(pattern, chunk.lower(), re.DOTALL):
                 match = gold
                 break
         results.append(MatchResult(is_relevant=match is not None, matching_gold=match))
