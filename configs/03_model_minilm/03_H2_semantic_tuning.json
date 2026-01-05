@@ -1,0 +1,72 @@
+{
+  "embedding_model": "all-MiniLM-L6-v2",
+  "retriever_type": "faiss",
+  "top_k": 5,
+  "input_file": "data/preprocessed/categorized.jsonl",
+  "experiments": [
+    {
+      "name": "semantic_t0.5",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.5,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.6",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.6,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.7",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.7,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.75",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.75,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.8",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.8,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.85",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.85,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.9",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.9,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    },
+    {
+      "name": "semantic_t0.95",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.95,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    }
+  ]
+}

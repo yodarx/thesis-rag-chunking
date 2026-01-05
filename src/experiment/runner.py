@@ -71,7 +71,7 @@ class ExperimentRunner:
             self.retriever.load_index(index_path, chunks_path)
 
             for data_point in tqdm(self.dataset, desc=f"Evaluating {exp_name}"):
-                # Retrieve relevant chunks for the question
+                # Retrieve relevant chunks for the question (ONCE - expensive operation)
                 retrieved_chunks: list[str] = self.retriever.retrieve(
                     data_point["question"], self.top_k
                 )
@@ -80,6 +80,9 @@ class ExperimentRunner:
                 print(f"Retrieved Chunks: {retrieved_chunks}")
 
                 log_matches: bool = experiment.get("log_matches", False)
+
+                # --- H2: Retrieve once, measure multiple k-values ---
+                # Standard metrics at configured k
                 metrics: dict[str, float] = evaluation.calculate_metrics(
                     retrieved_chunks=retrieved_chunks,
                     gold_passages=data_point["gold_passages"],
@@ -87,6 +90,27 @@ class ExperimentRunner:
                     question=data_point["question"],
                     log_matches=log_matches,
                 )
+
+                # Additional: Calculate metrics for different k-values (cheap re-computations)
+                # This allows measuring the impact of retrieval depth in a single run
+                k_levels: list[int] = [1, 3, 5, 10, 20]
+
+                for k_val in k_levels:
+                    # Only calculate if we have enough chunks retrieved
+                    if k_val <= self.top_k:
+                        sub_metrics: dict[str, float] = evaluation.calculate_metrics(
+                            retrieved_chunks=retrieved_chunks,
+                            gold_passages=data_point["gold_passages"],
+                            k=k_val,
+                        )
+
+                        # Store with @k suffix for clarity (e.g., "ndcg@1", "recall@5")
+                        metrics[f"ndcg@{k_val}"] = sub_metrics["ndcg_at_k"]
+                        metrics[f"recall@{k_val}"] = sub_metrics["recall_at_k"]
+                        metrics[f"precision@{k_val}"] = sub_metrics["precision_at_k"]
+                        metrics[f"f1@{k_val}"] = sub_metrics["f1_score_at_k"]
+                        metrics[f"mrr@{k_val}"] = sub_metrics["mrr"]
+                        metrics[f"map@{k_val}"] = sub_metrics["map"]
 
                 # Chunking time is 0, num_chunks is from the loaded index
                 self.results_handler.add_result_record(

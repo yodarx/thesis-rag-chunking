@@ -1,0 +1,24 @@
+{
+  "embedding_model": "BAAI/bge-large-en-v1.5",
+  "retriever_type": "faiss",
+  "top_k": 5,
+  "input_file": "data/preprocessed/DEIN_MULTIHOP_DATASET.jsonl",
+  "experiments": [
+    {
+      "name": "mh_fixed_512_0",
+      "function": "chunk_fixed_size",
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 0
+      }
+    },
+    {
+      "name": "mh_semantic_t0.8_bge_base",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.8,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
+    }
+  ]
+}
