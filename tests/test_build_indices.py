@@ -118,6 +118,7 @@ def test_build_indices_skips_if_index_exists(
         index_dir.mkdir(parents=True, exist_ok=True)
         (index_dir / "index.faiss").write_text("dummy")
         (index_dir / "chunks.json").write_text("[]")
+        (index_dir / "metadata.json").write_text('{"build_time_seconds": 1.23}')
 
         build_indices.main(sample_config)
         mock_write_index.assert_not_called()

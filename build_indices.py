@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import time
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
@@ -59,11 +60,20 @@ def build_faiss_index(chunks: list[str], vectorizer: Vectorizer) -> faiss.IndexF
     return index
 
 
-def save_index(index: faiss.IndexFlatL2, index_dir: str, chunks: list[str]) -> None:
+def save_index(index: faiss.IndexFlatL2, index_dir: str, chunks: list[str], build_time: float) -> None:
     os.makedirs(index_dir, exist_ok=True)
     faiss.write_index(index, os.path.join(index_dir, "index.faiss"))
     with open(os.path.join(index_dir, "chunks.json"), "w", encoding="utf-8") as f:
         json.dump(chunks, f)
+
+    # Save metadata with build time
+    metadata: dict[str, Any] = {
+        "build_time_seconds": build_time,
+        "num_chunks": len(chunks),
+        "timestamp": datetime.now().isoformat(),
+    }
+    with open(os.path.join(index_dir, "metadata.json"), "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2)
 
 
 def process_experiment(
@@ -78,9 +88,12 @@ def process_experiment(
     )
     index_path = os.path.join(index_dir, "index.faiss")
     chunks_path = os.path.join(index_dir, "chunks.json")
-    if os.path.exists(index_path) and os.path.exists(chunks_path):
+    metadata_path = os.path.join(index_dir, "metadata.json")
+    if os.path.exists(index_path) and os.path.exists(chunks_path) and os.path.exists(metadata_path):
         print(f"Index already exists for {experiment['name']} at {index_dir}. Skipping.")
         return
+
+    start_time: float = time.time()
     chunks: list[str] = []
     for data_point in tqdm(dataset, desc=f"Chunking {experiment['name']}"):
         text: str = data_point.get("document_text", "")
@@ -89,9 +102,11 @@ def process_experiment(
             params = params.copy()
             params["chunking_embeddings"] = vectorizer
         chunks.extend(chunk_func(text, **params))
+
     index: faiss.IndexFlatL2 = build_faiss_index(chunks, vectorizer)
     if index is not None:
-        save_index(index, index_dir, chunks)
+        build_time: float = time.time() - start_time
+        save_index(index, index_dir, chunks, build_time)
 
 
 def main(config_path: str) -> None:
