@@ -63,7 +63,7 @@ def calculate_metrics(
     return {
         "mrr": calculate_mrr(relevance_scores),
         "map": calculate_map(relevance_scores),
-        "ndcg_at_k": calculate_ndcg_at_k(relevance_scores),
+        "ndcg_at_k": calculate_ndcg_at_k(relevance_scores, total_relevant_gold),
         "precision_at_k": precision,
         "recall_at_k": recall,
         "f1_score_at_k": calculate_f1_score_at_k(precision, recall),
@@ -90,12 +90,30 @@ def calculate_map(relevance_scores: list[int]) -> float:
     return score / relevant if relevant else 0.0
 
 
-def calculate_ndcg_at_k(relevance_scores: list[int]) -> float:
-    """Berechnet den Normalized Discounted Cumulative Gain at k."""
-    dcg: float = sum(rel / np.log2(idx + 2) for idx, rel in enumerate(relevance_scores))
-    ideal: float = sum(1.0 / np.log2(idx + 2) for idx in range(sum(relevance_scores)))
-    return dcg / ideal if ideal > 0 else 0.0
+def calculate_ndcg_at_k(relevance_scores: list[int], total_gold_items: int) -> float:
+    """
+    Berechnet den Normalized Discounted Cumulative Gain at k.
+    Korrektur: IDCG basiert auf dem Minimum aus k und verfügbaren Gold-Items.
+    """
+    if not relevance_scores:
+        return 0.0
 
+    k = len(relevance_scores)
+
+    # 1. Berechne DCG (Was wir tatsächlich erreicht haben)
+    dcg: float = sum(rel / np.log2(idx + 2) for idx, rel in enumerate(relevance_scores))
+
+    # 2. Berechne IDCG (Was maximal möglich gewesen wäre)
+    # Das Ideal ist: Wir hätten 'k' Treffer, ODER alle 'total_gold_items' (falls weniger als k vorhanden sind)
+    max_possible_matches = min(total_gold_items, k)
+
+    if max_possible_matches == 0:
+        return 0.0
+
+    # Das ideale Ranking sind lauter 1en an der Spitze: [1, 1, 1...]
+    ideal_dcg: float = sum(1.0 / np.log2(idx + 2) for idx in range(max_possible_matches))
+
+    return dcg / ideal_dcg if ideal_dcg > 0 else 0.0
 
 def calculate_precision_at_k(relevance_scores: list[int]) -> float:
     """Berechnet die Precision für die abgerufenen k Ergebnisse."""
