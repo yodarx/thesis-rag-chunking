@@ -46,17 +46,33 @@ def load_config(config_path: str) -> dict[str, Any]:
         raise RuntimeError(f"Error loading config file: {e}") from e
 
 
-def build_faiss_index(chunks: list[str], vectorizer: Vectorizer) -> faiss.IndexFlatL2 | None:
+def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, batch_size: int = 32) -> faiss.IndexFlatL2 | None:
     if not chunks:
         print("Warning: No chunks provided for indexing. Skipping index creation.")
         return None
-    embeddings: np.ndarray = np.array(vectorizer.embed_documents(chunks)).astype("float32")
-    if embeddings.ndim != 2 or embeddings.shape[1] == 0:
+
+    # Create index with first batch to determine dimension
+    print("Initializing FAISS index...")
+    first_batch_embeddings: np.ndarray = np.array(
+        vectorizer.embed_documents(chunks[:batch_size])
+    ).astype("float32")
+
+    if first_batch_embeddings.ndim != 2 or first_batch_embeddings.shape[1] == 0:
         print("Warning: Embeddings are empty or malformed. Skipping index creation.")
         return None
-    dimension: int = embeddings.shape[1]
+
+    dimension: int = first_batch_embeddings.shape[1]
     index: faiss.IndexFlatL2 = faiss.IndexFlatL2(dimension)
-    index.add(embeddings)
+    index.add(first_batch_embeddings)
+
+    # Process remaining chunks in batches
+    for i in tqdm(range(batch_size, len(chunks), batch_size), desc="Building index"):
+        batch_end: int = min(i + batch_size, len(chunks))
+        batch_embeddings: np.ndarray = np.array(
+            vectorizer.embed_documents(chunks[i:batch_end])
+        ).astype("float32")
+        index.add(batch_embeddings)
+
     return index
 
 
@@ -82,6 +98,7 @@ def process_experiment(
     dataset: list[dict[str, Any]],
     vectorizer: Vectorizer,
     output_dir: str,
+    batch_size: int = 32,
 ) -> None:
     chunk_func: Callable[..., list[str]] = get_chunking_function(experiment["function"])
     index_dir: str = os.path.join(
@@ -104,13 +121,13 @@ def process_experiment(
             params["chunking_embeddings"] = vectorizer
         chunks.extend(chunk_func(text, **params))
 
-    index: faiss.IndexFlatL2 = build_faiss_index(chunks, vectorizer)
+    index: faiss.IndexFlatL2 = build_faiss_index(chunks, vectorizer, batch_size)
     if index is not None:
         build_time: float = time.time() - start_time
         save_index(index, index_dir, chunks, build_time)
 
 
-def main(config_path: str, output_dir: str | None = None) -> None:
+def main(config_path: str, output_dir: str | None = None, batch_size: int = 32) -> None:
     config: dict[str, Any] = load_config(config_path)
     input_filepath: str | None = config.get("input_file")
     if "embedding_model" not in config:
@@ -122,15 +139,16 @@ def main(config_path: str, output_dir: str | None = None) -> None:
     dataset: list[dict[str, Any]] = load_asqa_dataset(input_filepath, config.get("limit"))
     vectorizer: Vectorizer = Vectorizer.from_model_name(config["embedding_model"])
     for experiment in config["experiments"]:
-        process_experiment(experiment, config, dataset, vectorizer, output_dir)
+        process_experiment(experiment, config, dataset, vectorizer, output_dir, batch_size)
 
 
 def cli_entry() -> None:
     parser = argparse.ArgumentParser(description="Build FAISS indices for chunking experiments.")
     parser.add_argument("--config", type=str, required=True, help="Path to config JSON file.")
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory for indices (overrides config setting).")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size for embedding generation.")
     args = parser.parse_args()
-    main(args.config, args.output_dir)
+    main(args.config, args.output_dir, args.batch_size)
 
 
 if __name__ == "__main__":

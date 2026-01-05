@@ -63,6 +63,45 @@ def test_build_indices_success(
     mock_write_index.assert_called()
 
 
+@mock.patch("src.chunking.chunk_fixed.chunk_fixed_size")
+@mock.patch("build_indices.faiss.write_index")
+@mock.patch("build_indices.faiss.IndexFlatL2")
+@mock.patch("src.vectorizer.vectorizer.Vectorizer.from_model_name")
+@mock.patch("build_indices.load_asqa_dataset")
+def test_build_indices_with_custom_batch_size(
+    mock_load_data: mock.Mock,
+    mock_vectorizer_from_model_name: mock.Mock,
+    mock_flatl2: mock.Mock,
+    mock_write_index: mock.Mock,
+    mock_chunk_fixed_size: mock.Mock,
+    sample_config: str,
+) -> None:
+    # Create multiple chunks to test batching
+    mock_load_data.return_value = [
+        {"sample_id": "doc1", "document_text": "This is a test document."}
+    ]
+    # Create 100 chunks to test batching
+    chunks = [f"Chunk {i}" for i in range(100)]
+    mock_chunk_fixed_size.return_value = chunks
+    mock_flatl2.return_value = mock.Mock()
+    mock_flatl2.return_value.add = mock.Mock()
+    mock_vectorizer = mock.Mock()
+
+    # Mock embed_documents to return embeddings for batch of chunks
+    def mock_embed(chunk_list):
+        return [[0.1, 0.2, 0.3] for _ in chunk_list]
+
+    mock_vectorizer.embed_documents.side_effect = mock_embed
+    mock_vectorizer_from_model_name.return_value = mock_vectorizer
+
+    # Call with custom batch size of 16 - should not raise an error
+    build_indices.main(sample_config, batch_size=16)
+
+    # Verify the index was built and written
+    mock_write_index.assert_called()
+    assert mock_flatl2.return_value.add.called, "index.add should be called at least once"
+
+
 @mock.patch("build_indices.Vectorizer")
 @mock.patch("build_indices.load_asqa_dataset")
 def test_build_indices_with_custom_output_dir(mock_load_data, mock_vectorizer, tmp_path):
@@ -123,6 +162,21 @@ def test_build_indices_missing_config_fields(mock_load_data, mock_vectorizer, tm
 def test_build_indices_empty_dataset(mock_load_data, mock_vectorizer, sample_config):
     mock_load_data.return_value = []
     build_indices.main(sample_config)
+
+
+@mock.patch("build_indices.main")
+def test_cli_with_batch_size(mock_main):
+    """Test that CLI correctly passes batch-size argument"""
+    import sys
+
+    original_argv = sys.argv
+    try:
+        sys.argv = ["build_indices.py", "--config", "test_config.json", "--batch-size", "64"]
+        build_indices.cli_entry()
+        # Verify main was called with batch_size=64
+        mock_main.assert_called_once_with("test_config.json", None, 64)
+    finally:
+        sys.argv = original_argv
 
 
 @mock.patch("src.chunking.chunk_fixed.chunk_fixed_size")

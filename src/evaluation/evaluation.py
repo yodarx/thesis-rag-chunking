@@ -49,13 +49,13 @@ def calculate_metrics(
 
     # --- Logging logic ---
     if log_matches and question is not None:
-        # print(f"Question: {question}")
+        print(f"Question: {question}")
         # print(f"Retrieved Chunks: {chunks_at_k}")
         # print(f"Gold Passages: {gold_passages}")
         found_match = False
         for idx, res in enumerate(match_results):
             if res.is_relevant:
-                # print(f"Match at position {idx + 1}: {res.matching_gold}")
+                print(f"Match at position {idx + 1}: {res.matching_gold}")
                 found_match = True
         if not found_match:
             print("NO MATCHES FOUND")

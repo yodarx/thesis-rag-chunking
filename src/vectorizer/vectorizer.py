@@ -39,6 +39,6 @@ class Vectorizer:
         if not documents:
             return []
 
-        embeddings_array: np.ndarray = self.model.encode(documents, show_progress_bar=False)
+        embeddings_array: np.ndarray = self.model.encode(documents, show_progress_bar=True)
 
         return embeddings_array.tolist()
