@@ -76,8 +76,8 @@ class ExperimentRunner:
                     data_point["question"], self.top_k
                 )
 
-                print(f"\nQuestion: {data_point['question']}")
-                print(f"Retrieved Chunks: {retrieved_chunks}")
+                # print(f"\nQuestion: {data_point['question']}")
+                # print(f"Retrieved Chunks: {retrieved_chunks}")
 
                 log_matches: bool = experiment.get("log_matches", False)
 
