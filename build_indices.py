@@ -81,10 +81,11 @@ def process_experiment(
     config: dict[str, Any],
     dataset: list[dict[str, Any]],
     vectorizer: Vectorizer,
+    output_dir: str,
 ) -> None:
     chunk_func: Callable[..., list[str]] = get_chunking_function(experiment["function"])
     index_dir: str = os.path.join(
-        "data", "indices", create_index_name(experiment["name"], config["embedding_model"])
+        output_dir, create_index_name(experiment["name"], config["embedding_model"])
     )
     index_path = os.path.join(index_dir, "index.faiss")
     chunks_path = os.path.join(index_dir, "chunks.json")
@@ -109,23 +110,27 @@ def process_experiment(
         save_index(index, index_dir, chunks, build_time)
 
 
-def main(config_path: str) -> None:
+def main(config_path: str, output_dir: str | None = None) -> None:
     config: dict[str, Any] = load_config(config_path)
     input_filepath: str | None = config.get("input_file")
     if "embedding_model" not in config:
         print("Error: 'embedding_model' missing from config. Skipping.")
         return
+    # Use argument if provided, otherwise fall back to config, then default
+    if output_dir is None:
+        output_dir = config.get("output_dir", "data/indices")
     dataset: list[dict[str, Any]] = load_asqa_dataset(input_filepath, config.get("limit"))
     vectorizer: Vectorizer = Vectorizer.from_model_name(config["embedding_model"])
     for experiment in config["experiments"]:
-        process_experiment(experiment, config, dataset, vectorizer)
+        process_experiment(experiment, config, dataset, vectorizer, output_dir)
 
 
 def cli_entry() -> None:
     parser = argparse.ArgumentParser(description="Build FAISS indices for chunking experiments.")
     parser.add_argument("--config", type=str, required=True, help="Path to config JSON file.")
+    parser.add_argument("--output-dir", type=str, default=None, help="Output directory for indices (overrides config setting).")
     args = parser.parse_args()
-    main(args.config)
+    main(args.config, args.output_dir)
 
 
 if __name__ == "__main__":
