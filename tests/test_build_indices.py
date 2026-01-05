@@ -88,7 +88,7 @@ def test_build_indices_with_custom_batch_size(
     mock_vectorizer = mock.Mock()
 
     # Mock embed_documents to return embeddings for batch of chunks
-    def mock_embed(chunk_list):
+    def mock_embed(chunk_list, batch_size):
         return [[0.1, 0.2, 0.3] for _ in chunk_list]
 
     mock_vectorizer.embed_documents.side_effect = mock_embed

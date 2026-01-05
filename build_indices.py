@@ -54,7 +54,7 @@ def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, batch_size: int
     # Create index with first batch to determine dimension
     print("Initializing FAISS index...")
     first_batch_embeddings: np.ndarray = np.array(
-        vectorizer.embed_documents(chunks[:batch_size])
+        vectorizer.embed_documents(chunks[:batch_size], batch_size)
     ).astype("float32")
 
     if first_batch_embeddings.ndim != 2 or first_batch_embeddings.shape[1] == 0:
@@ -69,7 +69,7 @@ def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, batch_size: int
     for i in tqdm(range(batch_size, len(chunks), batch_size), desc="Building index"):
         batch_end: int = min(i + batch_size, len(chunks))
         batch_embeddings: np.ndarray = np.array(
-            vectorizer.embed_documents(chunks[i:batch_end])
+            vectorizer.embed_documents(chunks[i:batch_end], batch_size)
         ).astype("float32")
         index.add(batch_embeddings)
 

@@ -32,13 +32,13 @@ class Vectorizer:
             return "xpu"
         return None
 
-    def embed_documents(self, documents: list[str]) -> list[list[float]]:
+    def embed_documents(self, documents: list[str], batch_size: int) -> list[list[float]]:
         """
         Wandelt eine Liste von Textdokumenten in Vektor-Embeddings um.
         """
         if not documents:
             return []
 
-        embeddings_array: np.ndarray = self.model.encode(documents, show_progress_bar=True)
+        embeddings_array: np.ndarray = self.model.encode(documents, show_progress_bar=True, batch_size=batch_size)
 
         return embeddings_array.tolist()
