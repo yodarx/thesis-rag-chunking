@@ -2,7 +2,7 @@
   "embedding_model": "BAAI/bge-base-en-v1.5",
   "retriever_type": "faiss",
   "top_k": 5,
-  "input_file": "data/preprocessed/categorized.jsonl",
+  "input_file": "data/preprocessed/gold.jsonl",
   "experiments": [
     {
       "name": "semantic_t0.5",

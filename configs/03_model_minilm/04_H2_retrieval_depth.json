@@ -2,7 +2,7 @@
   "embedding_model": "all-MiniLM-L6-v2",
   "retriever_type": "faiss",
   "top_k": 20,
-  "input_file": "data/preprocessed/categorized.jsonl",
+  "input_file": "data/preprocessed/gold.jsonl",
   "experiments": [
     {
       "name": "recursive_512_64",

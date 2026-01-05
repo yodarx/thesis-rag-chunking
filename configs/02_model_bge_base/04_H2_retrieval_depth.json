@@ -22,7 +22,7 @@
       "name": "recursive_512_64",
     {
   "experiments": [
-  "input_file": "data/preprocessed/categorized.jsonl",
+  "input_file": "data/preprocessed/gold.jsonl",
   "top_k": 20,
   "retriever_type": "faiss",
   "embedding_model": "BAAI/bge-base-en-v1.5",
