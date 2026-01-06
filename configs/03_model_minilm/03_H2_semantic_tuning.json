@@ -3,6 +3,7 @@
   "retriever_type": "faiss",
   "top_k": 5,
   "input_file": "data/preprocessed/gold.jsonl",
+  "silver_file": "data/preprocessed/silver.jsonl",
   "experiments": [
     {
       "name": "semantic_t0.5",

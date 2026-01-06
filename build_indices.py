@@ -71,7 +71,21 @@ def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, batch_size: int
         batch_embeddings: np.ndarray = np.array(
             vectorizer.embed_documents(chunks[i:batch_end], batch_size)
         ).astype("float32")
-        index.add(batch_embeddings)
+
+        # Validate batch before adding to index
+        if batch_embeddings.size == 0 or batch_embeddings.ndim != 2:
+            print(f"Warning: Skipping invalid batch at index {i}. Shape: {batch_embeddings.shape}")
+            continue
+
+        if batch_embeddings.shape[1] != dimension:
+            print(f"Warning: Embedding dimension mismatch. Expected {dimension}, got {batch_embeddings.shape[1]}. Skipping batch.")
+            continue
+
+        try:
+            index.add(batch_embeddings)
+        except MemoryError as e:
+            print(f"MemoryError while adding batch at index {i}. Reducing batch size or available memory. Error: {e}")
+            raise
 
     return index
 

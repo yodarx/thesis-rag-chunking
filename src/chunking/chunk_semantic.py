@@ -4,7 +4,7 @@ from langchain_experimental.text_splitter import SemanticChunker
 
 
 class EmbeddingVectorizer(Protocol):
-    def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
+    def embed_documents(self, texts: list[str], batch_size: int = 32) -> list[list[float]]: ...
 
     def embed_query(self, text: str) -> list[float]: ...
 
@@ -16,17 +16,17 @@ class LangChainEmbeddingWrapper:
         self.vectorizer = vectorizer
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        return self.vectorizer.embed_documents(texts)
+        return self.vectorizer.embed_documents(texts, batch_size=32)
 
     def embed_query(self, text: str) -> list[float]:
         return self.vectorizer.embed_query(text)
 
 
 def chunk_semantic(
-    text: str,
-    *,
-    chunking_embeddings: EmbeddingVectorizer | str,
-    similarity_threshold: float = 0.8,
+        text: str,
+        *,
+        chunking_embeddings: EmbeddingVectorizer | str,
+        similarity_threshold: float = 0.8,
 ) -> list[str]:
     """
     Splits text based on the semantic similarity of adjacent sentences using LangChain's SemanticChunker.

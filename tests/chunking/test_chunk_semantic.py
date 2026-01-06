@@ -26,7 +26,7 @@ def mock_vectorizer(mocker: Any) -> Any:
     """
     mock = mocker.Mock()
 
-    def embed_side_effect(texts: list[str]) -> list[list[float]]:
+    def embed_side_effect(texts: list[str], batch_size: int = 32) -> list[list[float]]:
         """Return embeddings based on text content to control semantic chunking."""
         embeddings = []
         for text in texts:

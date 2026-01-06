@@ -2,7 +2,8 @@
   "embedding_model": "BAAI/bge-large-en-v1.5",
   "retriever_type": "faiss",
   "top_k": 5,
-  "input_file": "data/preprocessed/silver.jsonl",
+  "input_file": "data/preprocessed/gold.jsonl",
+  "silver_file": "data/preprocessed/silver.jsonl",
   "experiments": [
     {
       "name": "mh_fixed_512_0",

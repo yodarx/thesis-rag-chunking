@@ -4,6 +4,7 @@
   "top_k": 5,
   "limit": 5,
   "input_file": "data/preprocessed/gold.jsonl",
+  "silver_file": "data/preprocessed/silver.jsonl",
   "experiments": [
     {
       "name": "sanity_check_fixed",

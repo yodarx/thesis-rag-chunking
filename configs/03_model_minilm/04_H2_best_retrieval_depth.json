@@ -3,6 +3,7 @@
   "retriever_type": "faiss",
   "top_k": 20,
   "input_file": "data/preprocessed/gold.jsonl",
+  "silver_file": "data/preprocessed/silver.jsonl",
   "experiments": [
     {
       "name": "recursive_512_64",
