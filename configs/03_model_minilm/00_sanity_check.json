@@ -9,7 +9,33 @@
     {
       "name": "sanity_check_fixed",
       "function": "chunk_fixed_size",
-      "params": { "chunk_size": 512, "chunk_overlap": 0 }
+      "params": {
+        "chunk_size": 512,
+        "chunk_overlap": 0
+      }
+    },
+    {
+      "name": "sanity_check_recursive_128_16",
+      "function": "chunk_recursive",
+      "params": {
+        "chunk_size": 128,
+        "chunk_overlap": 16
+      }
+      },
+    {
+      "name": "sanity_check_sentence_s5",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 5
+      }
+    },
+    {
+      "name": "sanity_check_semantic_t0.5",
+      "function": "chunk_semantic",
+      "params": {
+        "similarity_threshold": 0.5,
+        "chunking_embeddings": "BAAI/bge-base-en-v1.5"
+      }
     }
   ]
 }
