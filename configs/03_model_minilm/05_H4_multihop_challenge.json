@@ -6,7 +6,7 @@
   "silver_file": "data/preprocessed/silver.jsonl",
   "experiments": [
     {
-      "name": "mh_fixed_512_0",
+      "name": "fixed_512_0",
       "function": "chunk_fixed_size",
       "params": {
         "chunk_size": 512,
@@ -14,7 +14,7 @@
       }
     },
     {
-      "name": "mh_semantic_t0.8_bge_base",
+      "name": "semantic_t0.8_bge_base",
       "function": "chunk_semantic",
       "params": {
         "similarity_threshold": 0.8,
