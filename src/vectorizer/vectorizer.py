@@ -20,6 +20,8 @@ class Vectorizer:
         device: str | None = cls._get_device()
         print(f"Selected device for SentenceTransformer: {device if device else 'cpu'}")
         loaded_model: SentenceTransformer = SentenceTransformer(model_name, device=device)
+        loaded_model.half()
+
         return cls(loaded_model)
 
     @staticmethod
