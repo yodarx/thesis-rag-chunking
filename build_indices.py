@@ -9,6 +9,7 @@ from typing import Any
 
 import faiss
 import numpy as np
+import torch
 from tqdm import tqdm
 
 from src.chunking.chunk_fixed import chunk_fixed_size
@@ -53,9 +54,12 @@ def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, batch_size: int
 
     # Create index with first batch to determine dimension
     print("Initializing FAISS index...")
-    first_batch_embeddings: np.ndarray = np.array(
-        vectorizer.embed_documents(chunks[:batch_size], batch_size)
-    ).astype("float32")
+
+    torch.cuda.empty_cache()
+    first_batch_embeddings: np.ndarray = np.asarray(
+        vectorizer.embed_documents(chunks[:batch_size], batch_size),
+        dtype=np.float32,
+    )
 
     if first_batch_embeddings.ndim != 2 or first_batch_embeddings.shape[1] == 0:
         print("Warning: Embeddings are empty or malformed. Skipping index creation.")
@@ -67,10 +71,12 @@ def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, batch_size: int
 
     # Process remaining chunks in batches
     for i in tqdm(range(batch_size, len(chunks), batch_size), desc="Building index"):
+        torch.cuda.empty_cache()
         batch_end: int = min(i + batch_size, len(chunks))
-        batch_embeddings: np.ndarray = np.array(
-            vectorizer.embed_documents(chunks[i:batch_end], batch_size)
-        ).astype("float32")
+        batch_embeddings: np.ndarray = np.asarray(
+            vectorizer.embed_documents(chunks[i:batch_end], batch_size),
+            dtype=np.float32
+        )
 
         # Validate batch before adding to index
         if batch_embeddings.size == 0 or batch_embeddings.ndim != 2:
