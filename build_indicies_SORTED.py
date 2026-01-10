@@ -47,58 +47,46 @@ def load_config(config_path: str) -> dict:
 def calculate_dynamic_batch_size(current_max_char_len: int, model_name: str) -> int:
     """
     Optimiert für Nvidia L4 (24GB).
-    Aggressiver als vorher, da wir den Speicher jetzt regelmäßig bereinigen.
+    Fix: Verhindert Tuple-Fehler durch explizites Casting.
     """
     name = model_name.lower()
 
-    # Schätzung: 1 Token ~ 3-3.5 Zeichen (konservativ 3.0)
+    # Schätzung: 1 Token ~ 3.0 Zeichen
     est_tokens = max(current_max_char_len / 3.0, 1.0)
 
-    # --- 1. BUDGETS (Tokens pro Batch) ---
-    # L4 hat 24GB. Wir können hier mutig sein.
-
+    # 1. BUDGETS
     if "minilm" in name:
-        # MiniLM ist winzig. Hier limitiert eher die CPU/Python als der VRAM.
         token_budget = 6_000_000
     elif "large" in name:
-        # Large Modelle (330M Parameter) brauchen Platz.
-        # Vorher hattest du 250k, das ist zu wenig.
-        # 600k ist sicher für 24GB.
         token_budget = 600_000
     else:
-        # Base Modelle (110M Parameter)
-        # Vorher 900k -> Jetzt 1.5M
         token_budget = 1_500_000
 
-    # --- 2. QUADRATISCHER PENALTY (Physik bleibt Physik) ---
-    # Auch bei leerem Speicher wächst der Bedarf quadratisch zur Länge.
-    # Wir behalten das bei, lockern es aber leicht.
-    # Ab 512 Tokens fangen wir an zu drosseln.
+    # 2. PENALTY
     length_penalty = 1.0
     if est_tokens > 512:
-        length_penalty = 1 + (est_tokens / 1024.0)  # Etwas sanftere Kurve
+        length_penalty = 1 + (est_tokens / 1024.0)
 
     adjusted_budget = token_budget / length_penalty
+
+    # Hier sicherstellen, dass es wirklich ein INT ist (kein Tuple)
     optimal_bs = int(adjusted_budget / est_tokens)
 
-    # --- 3. HARD LIMITS (Safety Clamps) ---
+    # 3. HARD LIMITS
+    # Achte darauf, dass hier am Ende der Zeilen KEINE Kommas stehen!
+    max_limit = 32_000 if "minilm" in name else 16_000
 
-    # MiniLM verträgt extrem viel
-    max_limit = 32_000 if "minilm" in name else 20, 000
-
-    optimal_bs = max(optimal_bs, 64)  # Nicht unter 64 fallen
+    # Safety Clamps
+    optimal_bs = max(optimal_bs, 64)
     optimal_bs = min(optimal_bs, max_limit)
 
-    # Safety Clamp für Large Modelle
-    # Vorher: 128 (viel zu wenig für eine L4 bei kurzen Texten)
-    # Neu: Wir lassen die Formel entscheiden, deckeln aber bei 2048 für Large
+    # Large Model Special Case
     if "large" in name:
         optimal_bs = min(optimal_bs, 2048)
-        # Nur wenn es WIRKLICH lang wird (über 512 Tokens), gehen wir auf Nummer sicher
         if est_tokens > 512:
             optimal_bs = min(optimal_bs, 256)
 
-    return optimal_bs
+    return int(optimal_bs)
 
 
 def save_artifacts(index, index_dir, chunks, sorted_filename, build_time):
