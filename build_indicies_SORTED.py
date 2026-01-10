@@ -6,13 +6,12 @@ import threading
 import time
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any
 
 import faiss
 import torch
 from tqdm import tqdm
 
-# Deine Imports
+# Imports aus deinem Projekt
 from src.chunking.chunk_fixed import chunk_fixed_size
 from src.chunking.chunk_recursive import chunk_recursive
 from src.chunking.chunk_semantic import chunk_semantic
@@ -20,262 +19,212 @@ from src.chunking.chunk_sentence import chunk_by_sentence
 from src.experiment.data_loader import load_asqa_dataset
 from src.vectorizer.vectorizer import Vectorizer
 
+# --- CONFIGURATION ---
+# Verhindert Deadlocks bei High-Performance Loops
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# --- Helper Functions ---
+
+# --- HELPER FUNCTIONS ---
 def get_chunking_function(name: str) -> Callable[..., list[str]]:
-    chunk_functions: dict[str, Callable[..., list[str]]] = {
+    chunk_functions = {
         "chunk_fixed_size": chunk_fixed_size,
         "chunk_by_sentence": chunk_by_sentence,
         "chunk_recursive": chunk_recursive,
         "chunk_semantic": chunk_semantic,
     }
-    if name not in chunk_functions:
-        raise ValueError(f"Unknown chunking function: {name}")
     return chunk_functions[name]
 
 
-def create_index_name(experiment_name: str, model_name: str) -> str:
-    sanitized_model_name: str = model_name.replace("/", "_")
-    return f"{experiment_name}_{sanitized_model_name}"
+def create_index_name(exp_name: str, model_name: str) -> str:
+    return f"{exp_name}_{model_name.replace('/', '_')}"
 
 
-def load_config(config_path: str) -> dict[str, Any]:
-    with open(config_path) as f:
-        return json.load(f)
+def load_config(config_path: str) -> dict:
+    with open(config_path) as f: return json.load(f)
 
 
-def get_optimal_batch_size(model_name: str) -> int:
+# --- DYNAMIC BATCH SIZE LOGIC ---
+def calculate_dynamic_batch_size(current_max_char_len: int, model_name: str) -> int:
     """
-    Ermittelt die ideale Batch Size für eine Nvidia L4 (24GB VRAM) bei Nutzung von FP16.
-    ACHTUNG: Bei sortierten Daten (Smart Batching) sind die Batches "dichter" (weniger Padding).
-    Wir müssen etwas konservativer sein als bei zufälligen Daten.
+    Berechnet die optimale Batch-Size für Nvidia L4 (24GB).
+    Ziel: VRAM zu 90% füllen, aber nie crashen.
     """
-    name_lower = model_name.lower()
+    name = model_name.lower()
 
-    if "minilm" in name_lower:
-        return 8192
+    # Schätzung: 1 Token ~ 3-4 Zeichen. Wir rechnen konservativ mit 3.
+    # Wir nehmen Mindestlänge 1 an, um Division durch Null zu vermeiden.
+    est_tokens = max(current_max_char_len / 3.0, 1.0)
 
-    if "bge-base" in name_lower:
-        # Zufällig gingen 3000. Sortiert (dicht) sind 2048-2560 sicherer.
-        return 2048
+    # TOKEN BUDGETS (Wie viele Tokens passen gleichzeitig in den VRAM?)
+    if "minilm" in name:
+        # MiniLM ist winzig. Hier limitiert eher Python als der VRAM.
+        token_budget = 5_000_000
+    elif "large" in name:
+        # Large Modelle sind speicherhungrig.
+        token_budget = 400_000
+    else:
+        # Base Modelle (Standard)
+        token_budget = 1_300_000
 
-    if "bge-large" in name_lower:
-        # Große Modelle sind bei vollen 512-Token-Batches sehr speicherhungrig.
-        return 192
+    # Die Formel: Budget / Länge = Anzahl Sätze
+    optimal_bs = int(token_budget / est_tokens)
 
-    # Default Fallback
-    return 1024
+    # HARD LIMITS (Safety Clamps)
+    # Nach oben deckeln, damit Python nicht erstickt
+    max_limit = 32_000 if "minilm" in name else 20_000
+
+    # Nach unten deckeln, damit wir effizient bleiben
+    optimal_bs = max(optimal_bs, 128)
+    optimal_bs = min(optimal_bs, max_limit)
+
+    # Bei Large-Modellen nie über 4096 gehen, egal wie kurz der Text ist (Safety)
+    if "large" in name:
+        optimal_bs = min(optimal_bs, 4096)
+
+    return optimal_bs
 
 
-def save_index(
-        index: faiss.Index,
-        index_dir: str,
-        build_time: float,
-        num_chunks: int,
-        linked_cache_filename: str
-) -> None:
+def save_artifacts(index, index_dir, chunks, sorted_filename, build_time):
     os.makedirs(index_dir, exist_ok=True)
-    print(f"Saving FAISS index (FP16) to {index_dir}...")
+
+    print(f"💾 Saving FAISS Index to {index_dir}...")
     faiss.write_index(index, os.path.join(index_dir, "index.faiss"))
 
-    metadata: dict[str, Any] = {
-        "indexing_compute_duration_seconds": build_time,
-        "num_chunks": num_chunks,
-        "linked_cache_file": linked_cache_filename,  # WICHTIG: Verweis auf die SORTIERTE Datei
+    metadata = {
+        "indexing_duration": build_time,
+        "num_chunks": len(chunks),
+        "linked_cache_file": sorted_filename,  # WICHTIG für Retrieval!
         "timestamp": datetime.now().isoformat(),
         "faiss_ntotal": index.ntotal,
-        "index_type": "IndexScalarQuantizer_FP16",
-        "optimization": "global_sort_fp16"
+        "optimization": "sorted_dynamic_batching_fp16"
     }
-
-    with open(os.path.join(index_dir, "metadata.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(index_dir, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=2)
 
 
-# --- THREADED INDEX BUILDER ---
-def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, gpu_batch_size: int) -> faiss.Index | None:
-    if not chunks:
-        return None
+# --- THREADED BUILDER ---
+def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: str):
+    # 1. Init FAISS (FP16)
+    print("🔹 Initializing FAISS (FP16)...")
+    d = vectorizer.embed_documents(chunks[:1], batch_size=1).shape[1]
+    index = faiss.IndexScalarQuantizer(d, faiss.ScalarQuantizer.QT_fp16, faiss.METRIC_L2)
+    faiss.omp_set_num_threads(32)  # Nutze alle CPU Cores
 
-    print(f"Initializing FAISS (Chunks: {len(chunks)} | BatchSize: {gpu_batch_size})...")
+    result_queue = queue.Queue(maxsize=500)
 
-    # 1. Dimension ermitteln
-    sample_emb = vectorizer.embed_documents(chunks[:1], batch_size=1)
-    dimension = sample_emb.shape[1]
-
-    # 2. Index erstellen: ScalarQuantizer FP16 (Spart 50% RAM)
-    index = faiss.IndexScalarQuantizer(dimension, faiss.ScalarQuantizer.QT_fp16, faiss.METRIC_L2)
-
-    # 3. Setup Threads
-    faiss.omp_set_num_threads(32)  # Nutze alle CPU Cores für den Index
-
-    # 4. Threading Pipeline
-    # Wir entkoppeln GPU (Vectorizing) und CPU (Index Add)
-    result_queue = queue.Queue(maxsize=5)
-
-    def index_worker():
+    def worker():
         while True:
-            embeddings = result_queue.get()
-            if embeddings is None:
+            emb = result_queue.get()
+            if emb is None:
                 result_queue.task_done()
                 break
-            index.add(embeddings)
+            index.add(emb)
             result_queue.task_done()
 
-    worker_thread = threading.Thread(target=index_worker, daemon=True)
-    worker_thread.start()
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
 
-    # 5. Main Loop (GPU)
-    # Wir laden Daten in großen Blöcken, damit der RAM nicht explodiert
-    block_process_size = 100_000
-    total_chunks = len(chunks)
+    LOOP_BLOCK_SIZE = 50_000
+    total = len(chunks)
 
-    pbar = tqdm(total=total_chunks, desc="🚀 Sorted Indexing", unit="chunk")
-    start_time = time.time()
+    pbar = tqdm(total=total, desc="🚀 Init...", unit="chunk")
+    start = time.time()
 
     try:
-        for i in range(0, total_chunks, block_process_size):
-            end_idx = min(i + block_process_size, total_chunks)
-            batch_text = chunks[i:end_idx]
+        for i in range(0, total, LOOP_BLOCK_SIZE):
+            end = min(i + LOOP_BLOCK_SIZE, total)
+            batch_text = chunks[i:end]
 
-            # GPU Arbeit
-            embeddings = vectorizer.embed_documents(batch_text, batch_size=gpu_batch_size)
+            # Da sortiert: Der letzte Chunk ist der längste im aktuellen Block!
+            longest_char_len = len(batch_text[-1])
 
-            # Übergabe an CPU Worker
+            # Berechne optimale Batch Size für diesen Abschnitt
+            current_bs = calculate_dynamic_batch_size(longest_char_len, model_name)
+
+            # Update Anzeige (Live-Stats)
+            pbar.set_description(f"🚀 Speed | MaxLen: {longest_char_len:3} | BatchSize: {current_bs:5}")
+
+            # Vektorisieren
+            embeddings = vectorizer.embed_documents(batch_text, batch_size=current_bs)
+
+            # Ab in die Queue
             result_queue.put(embeddings)
             pbar.update(len(batch_text))
 
     except KeyboardInterrupt:
-        print("\nInterrupted! Stopping threads...")
+        print("\n⚠️ Abbruch durch User! Index wird NICHT gespeichert.")
         result_queue.put(None)
-        worker_thread.join()
-        return None
+        t.join()
+        return None, 0
 
+    # Clean finish
     result_queue.put(None)
-    worker_thread.join()
+    t.join()
     pbar.close()
 
-    duration = time.time() - start_time
-    print(f"Index built. Speed: {total_chunks / duration:.1f} chunks/sec")
-    return index
+    return index, time.time() - start
 
 
-# --- EXPERIMENT LOOP ---
-def process_experiment(
-        experiment: dict[str, Any],
-        config: dict[str, Any],
-        dataset: list[dict[str, Any]],
-        vectorizer: Vectorizer,
-        output_dir: str,
-        cache_dir: str,
-        manual_batch_size: int,  # Kann durch CLI überschrieben werden
-) -> None:
-    experiment_name = experiment["name"]
-    id_string = f"{experiment['name']}_{experiment['function']}"
+# --- MAIN LOGIC ---
+def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
+    name = exp["name"]
+    model_name = config["embedding_model"]
 
-    cache_filename = f"{experiment_name}_{id_string}_chunks.json"
-    meta_filename = f"{experiment_name}_{id_string}_metadata.json"
-    cache_path = os.path.join(cache_dir, cache_filename)
-    meta_path = os.path.join(cache_dir, meta_filename)
+    # 1. Chunks laden/erstellen
+    id_str = f"{name}_{exp['function']}"
+    cache_name = f"{name}_{id_str}_chunks.json"
+    cache_path = os.path.join(cache_dir, cache_name)
 
-    index_dir: str = os.path.join(
-        output_dir, create_index_name(experiment_name, config["embedding_model"])
-    )
-
-    if os.path.exists(os.path.join(index_dir, "index.faiss")):
-        print(f"Index already exists at {index_dir}. Skipping.")
-        return
-
-    # --- 1. Chunking Part (Load or Generate) ---
-    chunks: list[str] = []
+    chunks = []
     if os.path.exists(cache_path):
-        print(f"Cache hit! Loading chunks from {cache_path}...")
-        with open(cache_path, encoding="utf-8") as f:
+        print(f"[{name}] Lade Chunks aus Cache...")
+        with open(cache_path) as f:
             chunks = json.load(f)
     else:
-        print(f"Cache miss. Starting chunking for {experiment_name}...")
-        chunk_start_time = time.time()
-        chunk_func = get_chunking_function(experiment["function"])
-
-        for data_point in tqdm(dataset, desc="Chunking Docs"):
-            text = data_point.get("document_text", "")
-            params = experiment["params"]
-            if experiment["function"] == "chunk_semantic":
-                params = params.copy()
-                params["chunking_embeddings"] = vectorizer
-            chunks.extend(chunk_func(text, **params))
-
-        os.makedirs(cache_dir, exist_ok=True)
-        # Speichern der unsortierten Original-Chunks (zur Sicherheit)
-        with open(cache_path, "w", encoding="utf-8") as f:
+        print(f"[{name}] ⚠️ Cache Miss! Generiere Chunks...")
+        chunk_func = get_chunking_function(exp["function"])
+        for d in tqdm(dataset, desc="Chunking"):
+            chunks.extend(chunk_func(d.get("document_text", ""), **exp["params"]))
+        with open(cache_path, "w") as f:
             json.dump(chunks, f)
 
-        # Save Chunk Metadata
-        chunk_metadata = {
-            "experiment_name": experiment_name,
-            "chunking_function": experiment["function"],
-            "parameters": experiment["params"],
-            "num_chunks": len(chunks),
-            "chunking_duration_seconds": time.time() - chunk_start_time,
-            "created_at": datetime.now().isoformat()
-        }
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(chunk_metadata, f, indent=2)
-
-    print(f"⚡ Sorting {len(chunks)} chunks by length to minimize padding...")
+    # 2. SORTING (Der Speed Boost)
+    print(f"⚡ Sorting {len(chunks)} chunks (Global Sort)...")
     chunks.sort(key=len)
 
-    sorted_cache_filename = cache_filename.replace(".json", "_SORTED.json")
-    sorted_cache_path = os.path.join(cache_dir, sorted_cache_filename)
-
-    print(f"💾 Saving sorted chunks map to {sorted_cache_path}...")
-    with open(sorted_cache_path, "w", encoding="utf-8") as f:
+    # Sortierte Map speichern (WICHTIG!)
+    sorted_name = cache_name.replace(".json", "_SORTED.json")
+    print(f"💾 Saving sorted map to {sorted_name}...")
+    with open(os.path.join(cache_dir, sorted_name), "w") as f:
         json.dump(chunks, f)
 
-    # --- 3. Batch Size Logic ---
-    final_batch_size = manual_batch_size
-    if final_batch_size <= 0:
-        final_batch_size = get_optimal_batch_size(config["embedding_model"])
-        print(f"⚡ Auto-Optimized Batch Size for L4 (Sorted/Dense): {final_batch_size}")
+    # 3. Index bauen
+    index_dir = os.path.join(out_dir, create_index_name(name, model_name))
+    if os.path.exists(os.path.join(index_dir, "index.faiss")):
+        print(f"✅ Index {index_dir} existiert bereits. Skip.")
+        return
 
-    # --- 4. Indexing Part ---
-    start_index_time = time.time()
-    index = build_faiss_index(chunks, vectorizer, gpu_batch_size=final_batch_size)
+    index, duration = build_index_dynamic(chunks, vec, model_name)
 
-    if index is not None:
-        # Wir übergeben hier den neuen sorted_cache_filename!
-        save_index(index, index_dir, time.time() - start_index_time, len(chunks), sorted_cache_filename)
+    if index:
+        save_artifacts(index, index_dir, chunks, sorted_name, duration)
 
 
-def main(config_path: str, output_dir: str | None, cache_dir: str | None, batch_size: int) -> None:
-    config = load_config(config_path)
-
-    input_filepath = config.get("input_file")
-    if output_dir is None: output_dir = config.get("output_dir", "data/indices")
-    if cache_dir is None: cache_dir = "data/chunks"
-
-    dataset = load_asqa_dataset(input_filepath, config.get("limit"))
-    vectorizer = Vectorizer.from_model_name(config["embedding_model"])
-
-    for experiment in config["experiments"]:
-        process_experiment(experiment, config, dataset, vectorizer, output_dir, cache_dir, batch_size)
-
-
-def cli_entry() -> None:
+def main():
+    torch.set_float32_matmul_precision('medium')
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True)
-    parser.add_argument("--output-dir", type=str, default=None)
-    parser.add_argument("--cache-dir", type=str, default="data/chunks")
-    # Default ist jetzt -1, damit wir wissen, ob der User was angegeben hat oder nicht
-    parser.add_argument("--batch-size", type=int, default=-1,
-                        help="Set specific batch size or leave empty for auto-optimization")
+    parser.add_argument("--config", required=True)
+    parser.add_argument("--output-dir", default="data/indices")
+    parser.add_argument("--cache-dir", default="data/chunks")
     args = parser.parse_args()
 
-    main(args.config, args.output_dir, args.cache_dir, args.batch_size)
+    config = load_config(args.config)
+    dataset = load_asqa_dataset(config.get("input_file"), config.get("limit"))
+    vec = Vectorizer.from_model_name(config["embedding_model"])
+
+    for exp in config["experiments"]:
+        process_experiment(exp, config, dataset, vec, args.output_dir, args.cache_dir)
 
 
 if __name__ == "__main__":
-    print(f"--- Execution started at: {datetime.now()} ---")
-    torch.set_float32_matmul_precision('medium')
-    cli_entry()
-    print(f"--- Execution finished at: {datetime.now()} ---")
+    main()
