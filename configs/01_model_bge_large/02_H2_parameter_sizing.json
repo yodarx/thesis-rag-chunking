@@ -6,6 +6,34 @@
   "silver_file": "data/preprocessed/silver.jsonl",
   "experiments": [
     {
+      "name": "sentence_s1",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 1
+      }
+    },
+    {
+      "name": "sentence_s3",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 3
+      }
+    },
+    {
+      "name": "sentence_s5",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 5
+      }
+    },
+    {
+      "name": "sentence_s10",
+      "function": "chunk_by_sentence",
+      "params": {
+        "sentences_per_chunk": 10
+      }
+    },
+    {
       "name": "recursive_128_16",
       "function": "chunk_recursive",
       "params": {
@@ -99,34 +127,6 @@
       "params": {
         "chunk_size": 1024,
         "chunk_overlap": 128
-      }
-    },
-    {
-      "name": "sentence_s1",
-      "function": "chunk_by_sentence",
-      "params": {
-        "sentences_per_chunk": 1
-      }
-    },
-    {
-      "name": "sentence_s3",
-      "function": "chunk_by_sentence",
-      "params": {
-        "sentences_per_chunk": 3
-      }
-    },
-    {
-      "name": "sentence_s5",
-      "function": "chunk_by_sentence",
-      "params": {
-        "sentences_per_chunk": 5
-      }
-    },
-    {
-      "name": "sentence_s10",
-      "function": "chunk_by_sentence",
-      "params": {
-        "sentences_per_chunk": 10
       }
     }
   ]
