@@ -13,15 +13,16 @@ class Vectorizer:
         print(f"Selected device for SentenceTransformer: {device if device else 'cpu'}")
 
         loaded_model: SentenceTransformer = SentenceTransformer(model_name, device=device)
-
         loaded_model.half()
 
         if hasattr(torch, "compile"):
             try:
-                print("Compiling model with torch.compile for extra speed...")
-                loaded_model = torch.compile(loaded_model)
+                print("Compiling transformer backbone with torch.compile...")
+                transformer_module = loaded_model._first_module().auto_model
+
+                loaded_model._first_module().auto_model = torch.compile(transformer_module)
             except Exception as e:
-                print(f"Could not compile model (continuing without compilation): {e}")
+                print(f"Compilation failed (running eager mode): {e}")
 
         return cls(loaded_model)
 
