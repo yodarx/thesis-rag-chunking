@@ -47,42 +47,44 @@ def load_config(config_path: str) -> dict:
 def calculate_dynamic_batch_size(current_max_char_len: int, model_name: str) -> int:
     """
     Berechnet die optimale Batch-Size für Nvidia L4 (24GB).
-    Ziel: VRAM zu 90% füllen, aber nie crashen.
+    Berücksichtigt den quadratischen Anstieg des Speicherbedarfs bei langen Sequenzen.
     """
     name = model_name.lower()
 
-    # Schätzung: 1 Token ~ 3-4 Zeichen. Wir rechnen konservativ mit 3.
-    # Wir nehmen Mindestlänge 1 an, um Division durch Null zu vermeiden.
+    # Schätzung: Tokens
     est_tokens = max(current_max_char_len / 3.0, 1.0)
 
-    # TOKEN BUDGETS (Wie viele Tokens passen gleichzeitig in den VRAM?)
+    # BASIS-BUDGETS (Konservativer gewählt)
     if "minilm" in name:
-        # MiniLM ist winzig. Hier limitiert eher Python als der VRAM.
-        token_budget = 5_000_000
+        token_budget = 4_000_000
     elif "large" in name:
-        # Large Modelle sind speicherhungrig.
-        token_budget = 400_000
+        token_budget = 250_000  # Reduziert für Sicherheit
     else:
-        # Base Modelle (Standard)
-        token_budget = 1_300_000
+        # Base Modelle
+        token_budget = 900_000
 
-    # Die Formel: Budget / Länge = Anzahl Sätze
-    optimal_bs = int(token_budget / est_tokens)
+        # --- DIE KORREKTUR: Quadratischer Penalty ---
+    # Je länger der Text, desto mehr "Sicherheitsabstand" brauchen wir.
+    # Bei 500 Zeichen: Faktor 1.0
+    # Bei 2000 Zeichen: Faktor ~1.5
+    # Wir teilen das Budget virtuell durch einen Penalty-Faktor.
+    length_penalty = 1 + (est_tokens / 512.0)
 
-    # HARD LIMITS (Safety Clamps)
-    # Nach oben deckeln, damit Python nicht erstickt
-    max_limit = 32_000 if "minilm" in name else 20_000
+    adjusted_budget = token_budget / length_penalty
 
-    # Nach unten deckeln, damit wir effizient bleiben
-    optimal_bs = max(optimal_bs, 128)
+    # Normale Berechnung mit angepasstem Budget
+    optimal_bs = int(adjusted_budget / est_tokens)
+
+    # HARD LIMITS
+    max_limit = 32_000 if "minilm" in name else 10_000  # Etwas runtergesetzt
+    optimal_bs = max(optimal_bs, 32)  # Minimum etwas kleiner erlauben
     optimal_bs = min(optimal_bs, max_limit)
 
-    # Bei Large-Modellen nie über 4096 gehen, egal wie kurz der Text ist (Safety)
-    if "large" in name:
-        optimal_bs = min(optimal_bs, 4096)
+    # Safety Clamp für Large Modelle bei langen Texten
+    if "large" in name and est_tokens > 256:
+        optimal_bs = min(optimal_bs, 128)  # Harte Obergrenze bei langen Texten
 
     return optimal_bs
-
 
 def save_artifacts(index, index_dir, chunks, sorted_filename, build_time):
     os.makedirs(index_dir, exist_ok=True)
@@ -150,6 +152,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
             # Ab in die Queue
             result_queue.put(embeddings)
             pbar.update(len(batch_text))
+            torch.cuda.empty_cache()
 
     except KeyboardInterrupt:
         print("\n⚠️ Abbruch durch User! Index wird NICHT gespeichert.")
