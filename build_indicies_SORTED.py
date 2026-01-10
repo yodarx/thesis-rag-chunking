@@ -19,6 +19,7 @@ from src.chunking.chunk_sentence import chunk_by_sentence
 from src.experiment.data_loader import load_asqa_dataset
 from src.vectorizer.vectorizer import Vectorizer
 
+
 # --- HELPER FUNCTIONS ---
 def get_chunking_function(name: str) -> Callable[..., list[str]]:
     chunk_functions = {
@@ -110,7 +111,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
     index = faiss.IndexScalarQuantizer(d, faiss.ScalarQuantizer.QT_fp16, faiss.METRIC_L2)
     faiss.omp_set_num_threads(32)
 
-    result_queue = queue.Queue(maxsize=20)
+    result_queue = queue.Queue(maxsize=10)
 
     def worker():
         while True:
@@ -184,8 +185,18 @@ def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
     else:
         print(f"[{name}] ⚠️ Cache Miss! Generiere Chunks...")
         chunk_func = get_chunking_function(exp["function"])
+        params = exp.get("params", {})
+
         for d in tqdm(dataset, desc="Chunking"):
-            chunks.extend(chunk_func(d.get("document_text", ""), **exp["params"]))
+            text = d.get("document_text", "")
+
+            call_params = params
+            if exp["function"] == "chunk_semantic":
+                call_params = params.copy()
+                call_params["chunking_embeddings"] = vec
+
+            chunks.extend(chunk_func(text, **call_params))
+
         with open(cache_path, "w") as f:
             json.dump(chunks, f)
 
