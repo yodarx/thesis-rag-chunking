@@ -19,11 +19,6 @@ from src.chunking.chunk_sentence import chunk_by_sentence
 from src.experiment.data_loader import load_asqa_dataset
 from src.vectorizer.vectorizer import Vectorizer
 
-# --- CONFIGURATION ---
-# Verhindert Deadlocks bei High-Performance Loops
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-
 # --- HELPER FUNCTIONS ---
 def get_chunking_function(name: str) -> Callable[..., list[str]]:
     chunk_functions = {
@@ -113,9 +108,9 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
     print("🔹 Initializing FAISS (FP16)...")
     d = vectorizer.embed_documents(chunks[:1], batch_size=1).shape[1]
     index = faiss.IndexScalarQuantizer(d, faiss.ScalarQuantizer.QT_fp16, faiss.METRIC_L2)
-    faiss.omp_set_num_threads(32)  # Nutze alle CPU Cores
+    faiss.omp_set_num_threads(32)
 
-    result_queue = queue.Queue(maxsize=500)
+    result_queue = queue.Queue(maxsize=20)
 
     def worker():
         while True:
@@ -129,7 +124,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
-    LOOP_BLOCK_SIZE = 100_000
+    LOOP_BLOCK_SIZE = 2_000
     total = len(chunks)
 
     pbar = tqdm(total=total, desc="🚀 Init...", unit="chunk")
