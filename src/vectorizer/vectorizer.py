@@ -5,22 +5,23 @@ from sentence_transformers import SentenceTransformer
 
 class Vectorizer:
     def __init__(self, model: SentenceTransformer) -> None:
-        """
-        Initialisiert den Vectorizer mit einem bereits geladenen
-        SentenceTransformer-Modell.
-        """
         self.model: SentenceTransformer = model
 
     @classmethod
     def from_model_name(cls, model_name: str = "all-MiniLM-L6-v2") -> "Vectorizer":
-        """
-        Erstellt eine neue Vectorizer-Instanz durch Laden eines Modells
-        anhand seines Namens. Wählt automatisch GPU, falls verfügbar, sonst CPU.
-        """
         device: str | None = cls._get_device()
         print(f"Selected device for SentenceTransformer: {device if device else 'cpu'}")
+
         loaded_model: SentenceTransformer = SentenceTransformer(model_name, device=device)
+
         loaded_model.half()
+
+        if hasattr(torch, "compile"):
+            try:
+                print("Compiling model with torch.compile for extra speed...")
+                loaded_model = torch.compile(loaded_model)
+            except Exception as e:
+                print(f"Could not compile model (continuing without compilation): {e}")
 
         return cls(loaded_model)
 
@@ -34,13 +35,20 @@ class Vectorizer:
             return "xpu"
         return None
 
-    def embed_documents(self, documents: list[str], batch_size: int) -> list[list[float]]:
+    def embed_documents(self, documents: list[str], batch_size: int) -> np.ndarray:
         """
         Wandelt eine Liste von Textdokumenten in Vektor-Embeddings um.
+        Gibt direkt ein Numpy-Array zurück (Float32).
         """
         if not documents:
-            return []
+            return np.empty((0, 0), dtype=np.float32)
 
-        embeddings_array: np.ndarray = self.model.encode(documents, show_progress_bar=True, batch_size=batch_size)
+        embeddings_array = self.model.encode(
+            documents,
+            show_progress_bar=False,
+            batch_size=batch_size,
+            convert_to_numpy=True,
+            normalize_embeddings=True
+        )
 
-        return embeddings_array.tolist()
+        return embeddings_array
