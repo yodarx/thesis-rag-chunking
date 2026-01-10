@@ -46,45 +46,60 @@ def load_config(config_path: str) -> dict:
 # --- DYNAMIC BATCH SIZE LOGIC ---
 def calculate_dynamic_batch_size(current_max_char_len: int, model_name: str) -> int:
     """
-    Berechnet die optimale Batch-Size für Nvidia L4 (24GB).
-    Berücksichtigt den quadratischen Anstieg des Speicherbedarfs bei langen Sequenzen.
+    Optimiert für Nvidia L4 (24GB).
+    Aggressiver als vorher, da wir den Speicher jetzt regelmäßig bereinigen.
     """
     name = model_name.lower()
 
-    # Schätzung: Tokens
+    # Schätzung: 1 Token ~ 3-3.5 Zeichen (konservativ 3.0)
     est_tokens = max(current_max_char_len / 3.0, 1.0)
 
-    # BASIS-BUDGETS (Konservativer gewählt)
-    if "minilm" in name:
-        token_budget = 4_000_000
-    elif "large" in name:
-        token_budget = 250_000  # Reduziert für Sicherheit
-    else:
-        # Base Modelle
-        token_budget = 900_000
+    # --- 1. BUDGETS (Tokens pro Batch) ---
+    # L4 hat 24GB. Wir können hier mutig sein.
 
-        # --- DIE KORREKTUR: Quadratischer Penalty ---
-    # Je länger der Text, desto mehr "Sicherheitsabstand" brauchen wir.
-    # Bei 500 Zeichen: Faktor 1.0
-    # Bei 2000 Zeichen: Faktor ~1.5
-    # Wir teilen das Budget virtuell durch einen Penalty-Faktor.
-    length_penalty = 1 + (est_tokens / 512.0)
+    if "minilm" in name:
+        # MiniLM ist winzig. Hier limitiert eher die CPU/Python als der VRAM.
+        token_budget = 6_000_000
+    elif "large" in name:
+        # Large Modelle (330M Parameter) brauchen Platz.
+        # Vorher hattest du 250k, das ist zu wenig.
+        # 600k ist sicher für 24GB.
+        token_budget = 600_000
+    else:
+        # Base Modelle (110M Parameter)
+        # Vorher 900k -> Jetzt 1.5M
+        token_budget = 1_500_000
+
+    # --- 2. QUADRATISCHER PENALTY (Physik bleibt Physik) ---
+    # Auch bei leerem Speicher wächst der Bedarf quadratisch zur Länge.
+    # Wir behalten das bei, lockern es aber leicht.
+    # Ab 512 Tokens fangen wir an zu drosseln.
+    length_penalty = 1.0
+    if est_tokens > 512:
+        length_penalty = 1 + (est_tokens / 1024.0)  # Etwas sanftere Kurve
 
     adjusted_budget = token_budget / length_penalty
-
-    # Normale Berechnung mit angepasstem Budget
     optimal_bs = int(adjusted_budget / est_tokens)
 
-    # HARD LIMITS
-    max_limit = 32_000 if "minilm" in name else 10_000  # Etwas runtergesetzt
-    optimal_bs = max(optimal_bs, 32)  # Minimum etwas kleiner erlauben
+    # --- 3. HARD LIMITS (Safety Clamps) ---
+
+    # MiniLM verträgt extrem viel
+    max_limit = 32_000 if "minilm" in name else 20, 000
+
+    optimal_bs = max(optimal_bs, 64)  # Nicht unter 64 fallen
     optimal_bs = min(optimal_bs, max_limit)
 
-    # Safety Clamp für Large Modelle bei langen Texten
-    if "large" in name and est_tokens > 256:
-        optimal_bs = min(optimal_bs, 128)  # Harte Obergrenze bei langen Texten
+    # Safety Clamp für Large Modelle
+    # Vorher: 128 (viel zu wenig für eine L4 bei kurzen Texten)
+    # Neu: Wir lassen die Formel entscheiden, deckeln aber bei 2048 für Large
+    if "large" in name:
+        optimal_bs = min(optimal_bs, 2048)
+        # Nur wenn es WIRKLICH lang wird (über 512 Tokens), gehen wir auf Nummer sicher
+        if est_tokens > 512:
+            optimal_bs = min(optimal_bs, 256)
 
     return optimal_bs
+
 
 def save_artifacts(index, index_dir, chunks, sorted_filename, build_time):
     os.makedirs(index_dir, exist_ok=True)
@@ -126,7 +141,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
-    LOOP_BLOCK_SIZE = 50_000
+    LOOP_BLOCK_SIZE = 2_000
     total = len(chunks)
 
     pbar = tqdm(total=total, desc="🚀 Init...", unit="chunk")
