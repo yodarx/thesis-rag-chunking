@@ -74,7 +74,7 @@ def calculate_dynamic_batch_size(current_max_char_len: int, model_name: str) -> 
 
     # 3. HARD LIMITS
     # Achte darauf, dass hier am Ende der Zeilen KEINE Kommas stehen!
-    max_limit = 32_000 if "minilm" in name else 16_000
+    max_limit = 64_000 if "minilm" in name else 32_000
 
     # Safety Clamps
     optimal_bs = max(optimal_bs, 64)
@@ -129,7 +129,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
-    LOOP_BLOCK_SIZE = 2_000
+    LOOP_BLOCK_SIZE = 100_000
     total = len(chunks)
 
     pbar = tqdm(total=total, desc="🚀 Init...", unit="chunk")
