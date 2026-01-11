@@ -1,4 +1,5 @@
 import argparse
+import gc  # WICHTIG: Für Garbage Collection
 import json
 import os
 import queue
@@ -7,7 +8,11 @@ import time
 from collections.abc import Callable
 from datetime import datetime
 
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
 import faiss
+import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -39,48 +44,47 @@ def load_config(config_path: str) -> dict:
     with open(config_path) as f: return json.load(f)
 
 
-# --- DYNAMIC BATCH SIZE LOGIC ---
 def calculate_dynamic_batch_size(current_max_char_len: int, model_name: str) -> int:
     """
     Optimiert für Nvidia L4 (24GB).
-    Fix: Verhindert Tuple-Fehler durch explizites Casting.
+    KONSERVATIVE EINSTELLUNG FÜR BGE-LARGE.
     """
     name = model_name.lower()
 
     # Schätzung: 1 Token ~ 3.0 Zeichen
     est_tokens = max(current_max_char_len / 3.0, 1.0)
 
-    # 1. BUDGETS
     if "minilm" in name:
         token_budget = 6_000_000
     elif "large" in name:
-        token_budget = 600_000
+        token_budget = 250_000
     else:
-        token_budget = 1_500_000
+        # Base Modelle
+        token_budget = 1_200_000
 
-    # 2. PENALTY
+    # 2. PENALTY (Quadratischer Anstieg bei Attention)
     length_penalty = 1.0
     if est_tokens > 512:
         length_penalty = 1 + (est_tokens / 1024.0)
 
     adjusted_budget = token_budget / length_penalty
-
-    # Hier sicherstellen, dass es wirklich ein INT ist (kein Tuple)
     optimal_bs = int(adjusted_budget / est_tokens)
 
     # 3. HARD LIMITS
-    # Achte darauf, dass hier am Ende der Zeilen KEINE Kommas stehen!
-    max_limit = 64_000 if "minilm" in name else 32_000
+    max_limit = 64_000 if "minilm" in name else 16_000
 
-    # Safety Clamps
-    optimal_bs = max(optimal_bs, 64)
+    optimal_bs = max(optimal_bs, 16)  # Minimum safety
     optimal_bs = min(optimal_bs, max_limit)
 
-    # Large Model Special Case
+    # --- SPECIAL CASE: LARGE MODELS ---
     if "large" in name:
-        optimal_bs = min(optimal_bs, 2048)
-        if est_tokens > 512:
+        optimal_bs = min(optimal_bs, 512)
+
+        if est_tokens > 200:
             optimal_bs = min(optimal_bs, 256)
+
+        if est_tokens > 450:
+            optimal_bs = min(optimal_bs, 128)
 
     return int(optimal_bs)
 
@@ -94,7 +98,7 @@ def save_artifacts(index, index_dir, chunks, sorted_filename, build_time):
     metadata = {
         "indexing_duration": build_time,
         "num_chunks": len(chunks),
-        "linked_cache_file": sorted_filename,  # WICHTIG für Retrieval!
+        "linked_cache_file": sorted_filename,
         "timestamp": datetime.now().isoformat(),
         "faiss_ntotal": index.ntotal,
         "optimization": "sorted_dynamic_batching_fp16"
@@ -105,13 +109,19 @@ def save_artifacts(index, index_dir, chunks, sorted_filename, build_time):
 
 # --- THREADED BUILDER ---
 def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: str):
-    # 1. Init FAISS (FP16)
     print("🔹 Initializing FAISS (FP16)...")
-    d = vectorizer.embed_documents(chunks[:1], batch_size=1).shape[1]
+
+    # Dummy Call für Dimension & Model Warmup
+    dummy = vectorizer.embed_documents(chunks[:1], batch_size=1)
+    if hasattr(dummy, "shape"):
+        d = dummy.shape[1]
+    else:
+        d = len(dummy[0])
+
     index = faiss.IndexScalarQuantizer(d, faiss.ScalarQuantizer.QT_fp16, faiss.METRIC_L2)
     faiss.omp_set_num_threads(32)
 
-    result_queue = queue.Queue(maxsize=10)
+    result_queue = queue.Queue(maxsize=5)
 
     def worker():
         while True:
@@ -125,7 +135,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
-    LOOP_BLOCK_SIZE = 2_000
+    LOOP_BLOCK_SIZE = 1_000
     total = len(chunks)
 
     pbar = tqdm(total=total, desc="🚀 Init...", unit="chunk")
@@ -139,25 +149,41 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
             # Da sortiert: Der letzte Chunk ist der längste im aktuellen Block!
             longest_char_len = len(batch_text[-1])
 
-            # Berechne optimale Batch Size für diesen Abschnitt
+            # Berechne optimale Batch Size
             current_bs = calculate_dynamic_batch_size(longest_char_len, model_name)
 
-            # Update Anzeige (Live-Stats)
-            pbar.set_description(f"🚀 Speed | MaxLen: {longest_char_len:3} | BatchSize: {current_bs:5}")
+            pbar.set_description(f"🚀 Speed | MaxLen: {longest_char_len:3} | BatchSize: {current_bs:4}")
 
             # Vektorisieren
             embeddings = vectorizer.embed_documents(batch_text, batch_size=current_bs)
 
+            # WICHTIG: Sofort von GPU lösen falls Tensor
+            if isinstance(embeddings, torch.Tensor):
+                embeddings = embeddings.detach().cpu().numpy()
+            elif not isinstance(embeddings, np.ndarray):
+                embeddings = np.array(embeddings)
+
             # Ab in die Queue
             result_queue.put(embeddings)
             pbar.update(len(batch_text))
-            torch.cuda.empty_cache()
+
+            # Cleanup
+            del embeddings
+            # WICHTIG: Regelmäßiger Cleanup
+            if i % (LOOP_BLOCK_SIZE * 2) == 0:
+                gc.collect()
+                torch.cuda.empty_cache()
 
     except KeyboardInterrupt:
         print("\n⚠️ Abbruch durch User! Index wird NICHT gespeichert.")
         result_queue.put(None)
         t.join()
         return None, 0
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+        result_queue.put(None)
+        t.join()
+        raise e
 
     # Clean finish
     result_queue.put(None)
@@ -167,7 +193,6 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
     return index, time.time() - start
 
 
-# --- MAIN LOGIC ---
 def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
     name = exp["name"]
     model_name = config["embedding_model"]
@@ -187,28 +212,31 @@ def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
         chunk_func = get_chunking_function(exp["function"])
         params = exp.get("params", {})
 
+        # Params kopieren und ggf. Vectorizer injizieren
+        call_params = params.copy()
+        if exp["function"] == "chunk_semantic":
+            # WICHTIG: Semantic Chunking braucht den Vectorizer als Objekt, nicht String
+            # Wir setzen hier die Batch Size für Semantic Chunking hoch (1024), da effizienter
+            call_params["chunking_embeddings"] = vec
+            if "batch_size" not in call_params:
+                call_params["batch_size"] = 1024
+
         for d in tqdm(dataset, desc="Chunking"):
             text = d.get("document_text", "")
-
-            call_params = params
-            if exp["function"] == "chunk_semantic":
-                call_params = params.copy()
-                call_params["chunking_embeddings"] = vec
-
             chunks.extend(chunk_func(text, **call_params))
 
         with open(cache_path, "w") as f:
             json.dump(chunks, f)
 
-    # 2. SORTING (Der Speed Boost)
+    # 2. SORTING
     print(f"⚡ Sorting {len(chunks)} chunks (Global Sort)...")
     chunks.sort(key=len)
 
-    # Sortierte Map speichern (WICHTIG!)
     sorted_name = cache_name.replace(".json", "_SORTED.json")
-    print(f"💾 Saving sorted map to {sorted_name}...")
-    with open(os.path.join(cache_dir, sorted_name), "w") as f:
-        json.dump(chunks, f)
+    if not os.path.exists(os.path.join(cache_dir, sorted_name)):
+        print(f"💾 Saving sorted map to {sorted_name}...")
+        with open(os.path.join(cache_dir, sorted_name), "w") as f:
+            json.dump(chunks, f)
 
     # 3. Index bauen
     index_dir = os.path.join(out_dir, create_index_name(name, model_name))
@@ -220,6 +248,12 @@ def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
 
     if index:
         save_artifacts(index, index_dir, chunks, sorted_name, duration)
+
+    # Cleanup nach Experiment
+    del index
+    del chunks
+    gc.collect()
+    torch.cuda.empty_cache()
 
 
 def main():
