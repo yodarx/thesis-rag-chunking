@@ -3,7 +3,6 @@
   "retriever_type": "faiss",
   "top_k": 5,
   "input_file": "data/preprocessed/silver.jsonl",
-  "silver_file": "data/preprocessed/silver.jsonl",
   "experiments": [
     {
       "name": "fixed_512_0",

@@ -4,7 +4,6 @@
   "top_k": 5,
   "limit": 40,
   "input_file": "data/preprocessed/gold.jsonl",
-  "silver_file": "data/preprocessed/silver.jsonl",
   "experiments": [
     {
       "name": "recursive_128_16",
