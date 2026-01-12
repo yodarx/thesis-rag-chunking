@@ -108,23 +108,21 @@ def test_run_main_gold_suffix(mock_dependencies, mocker):
     mock_dependencies["create_dir"].assert_called_once_with("gold")
 
 
-def test_run_main_silver_flag(mock_dependencies, mocker):
-    """Test that --silver flag uses the global silver_file from config."""
+def test_run_main_silver_dataset(mock_dependencies, mocker):
+    """Regression test after removing --silver flag: using a silver file is now driven by config['input_file']."""
     with open(config_path) as f:
         config_data = json.load(f)
 
-    # Add silver_file to config (at root level)
     config_data["silver_file"] = "data/silver/test_silver.jsonl"
+    config_data["input_file"] = config_data["silver_file"]
 
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
     mocker.patch("json.load", return_value=config_data)
     mocker.patch("shutil.copy")
-    mocker.patch("os.path.exists", return_value=True)  # Mock file existence
 
-    run.main(config_json=config_path, use_silver=True)
+    run.main(config_json=config_path)
 
     mock_dependencies["create_dir"].assert_called_once_with("silver")
-    # Should load data from the global silver_file
     mock_dependencies["load_data"].assert_called_with(
         "data/silver/test_silver.jsonl", config_data.get("limit")
     )

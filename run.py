@@ -70,8 +70,23 @@ def main(config_json: str = None, difficulty: str | None = None) -> None:
 
     suffix = ""
 
+    # Derive suffix from dataset type (config-driven; replaces removed --silver flag)
+    input_file = config.get("input_file")
+    if isinstance(input_file, str):
+        norm = input_file.replace("\\", "/").lower()
+        if "/silver/" in norm or norm.endswith("_silver.jsonl"):
+            suffix = "silver"
+        # Avoid misclassifying preprocessed files like data/preprocessed/gold.jsonl.
+        # Only tag as "gold" when it clearly comes from a gold dataset location or naming.
+        elif "/gold/" in norm or norm.endswith("_gold.jsonl"):
+            suffix = "gold"
+
     if difficulty:
         suffix = f"{suffix}_{difficulty}" if suffix else difficulty
+
+    # Emit a helpful message if the dataset path doesn't exist (loader returns []).
+    if input_file and isinstance(input_file, str) and not os.path.exists(input_file):
+        print(f"Warning: Dataset file not found: {input_file}")
 
     output_dir, timestamp = create_output_directory(suffix)
 

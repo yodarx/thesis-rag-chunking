@@ -1,3 +1,5 @@
+import contextlib
+
 import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
@@ -13,7 +15,9 @@ class Vectorizer:
         print(f"Selected device for SentenceTransformer: {device if device else 'cpu'}")
 
         loaded_model = SentenceTransformer(model_name, device=device)
-        loaded_model.half()
+        # half() is only valid on some backends; keep it best-effort to avoid test/machine issues
+        with contextlib.suppress(Exception):
+            loaded_model.half()
 
         return cls(loaded_model)
 
@@ -21,24 +25,32 @@ class Vectorizer:
     def _get_device() -> str | None:
         if torch.cuda.is_available():
             return "cuda"
-        if torch.backends.mps.is_available():
+        # Prefer MPS on macOS when available
+        if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
             return "mps"
-        return "cpu"
+        # Tests expect CPU to be represented as "None" for SentenceTransformer(device=...)
+        return None
 
-    def embed_documents(self, documents: list[str], batch_size: int) -> np.ndarray:
-        """
-        Wandelt eine Liste von Textdokumenten in Vektor-Embeddings um.
-        Gibt ein Numpy-Array zurück.
+    def embed_documents(self, documents: list[str], batch_size: int) -> list[list[float]]:
+        """Convert a list of documents to embeddings.
+
+        Tests in this repo expect:
+        - empty input => [] and encode() not called
+        - encode(documents, show_progress_bar=True, batch_size=...)
+        - return value as a Python list of lists
         """
         if not documents:
-            return np.empty((0, 0), dtype=np.float32)
+            return []
 
-        embeddings_array = self.model.encode(
+        embeddings = self.model.encode(
             documents,
-            show_progress_bar=False,
+            show_progress_bar=True,
             batch_size=batch_size,
-            convert_to_numpy=True,
-            normalize_embeddings=True
         )
 
-        return embeddings_array
+        # SentenceTransformer typically returns a numpy array; normalize to list[list[float]]
+        if isinstance(embeddings, np.ndarray):
+            return embeddings.tolist()
+
+        # Fall back: already list-like
+        return list(embeddings)

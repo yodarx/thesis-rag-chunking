@@ -15,8 +15,7 @@ def e2e_gold_setup(tmp_path):
     config = {
         "embedding_model": "dummy-model",
         "top_k": 2,
-        "input_file": "placeholder",  # Will be updated in test
-        "silver_file": "data/silver/test_exp_dummy-model_silver.jsonl",
+        "input_file": "placeholder",
         "experiments": [
             {
                 "name": "test_exp",
@@ -127,9 +126,9 @@ def test_e2e_gold_pipeline(e2e_gold_setup):
             os.chdir(cwd)
 
 
-def test_e2e_silver_missing_file_warning(e2e_gold_setup, caplog):
+def test_e2e_silver_missing_dataset(e2e_gold_setup, caplog):
     """
-    Test that if silver file is missing, we handle it gracefully
+    Test that if a dataset file is missing, we handle it gracefully
     by printing an error message and returning.
     """
     config_path, tmp_path = e2e_gold_setup
@@ -139,6 +138,12 @@ def test_e2e_silver_missing_file_warning(e2e_gold_setup, caplog):
     # Ensure no silver file exists
     if silver_path.exists():
         os.remove(silver_path)
+
+    with open(config_path) as f:
+        config = json.load(f)
+    config["input_file"] = str(silver_path)
+    with open(config_path, "w") as f:
+        json.dump(config, f)
 
     # Mock dependencies
     with patch("run.Vectorizer"), patch("run.create_output_directory") as mock_create_out:
@@ -157,14 +162,13 @@ def test_e2e_silver_missing_file_warning(e2e_gold_setup, caplog):
             old_stdout = sys.stdout
             sys.stdout = captured_output
 
-            # Run main with config path AND use_silver=True
-            run.main(str(config_path), use_silver=True)
+            run.main(str(config_path))
 
             sys.stdout = old_stdout
             output = captured_output.getvalue()
 
             # Assert error message was printed about missing silver file
-            assert "Error: Silver file not found" in output or "not found" in output.lower()
+            assert "not found" in output.lower()
 
             # Assert file was NOT created
             assert not silver_path.exists()
