@@ -1,6 +1,5 @@
 import json
 import os
-import shutil
 from pathlib import Path
 from unittest import mock
 
@@ -53,7 +52,9 @@ def test_build_indices_success(
     tmp_path: Path,
 ) -> None:
     # Force cache miss for chunks.json to ensure we run chunking
-    mock_path_exists.side_effect = lambda p: False if str(p).endswith("chunks.json") else Path(p).exists()
+    mock_path_exists.side_effect = (
+        lambda p: False if str(p).endswith("chunks.json") else Path(p).exists()
+    )
 
     # Mock dataset loader
     mock_load_data.return_value = [
@@ -86,7 +87,9 @@ def test_build_indices_with_custom_batch_size(
 ) -> None:
     # Force cache miss so logic uses our mocks, but allow other checks to pass
     # Use Path(p).exists() to avoid recursion if os.path.exists is mocked
-    mock_path_exists.side_effect = lambda p: False if str(p).endswith("chunks.json") else Path(p).exists()
+    mock_path_exists.side_effect = (
+        lambda p: False if str(p).endswith("chunks.json") else Path(p).exists()
+    )
 
     # Create multiple chunks to test batching
     mock_load_data.return_value = [
@@ -113,13 +116,17 @@ def test_build_indices_with_custom_batch_size(
     # build_faiss_index(chunks, vectorizer, gpu_batch_size)
     assert mock_build_faiss_index.called
     _args, kwargs = mock_build_faiss_index.call_args
-    assert kwargs.get("gpu_batch_size") == 16, f"Expected gpu_batch_size=16, got {kwargs.get('gpu_batch_size')}"
+    assert kwargs.get("gpu_batch_size") == 16, (
+        f"Expected gpu_batch_size=16, got {kwargs.get('gpu_batch_size')}"
+    )
 
 
 @mock.patch("build_indices.faiss.write_index")
 @mock.patch("build_indices.Vectorizer")
 @mock.patch("build_indices.load_asqa_dataset")
-def test_build_indices_with_custom_output_dir(mock_load_data, mock_vectorizer, mock_write_index, tmp_path):
+def test_build_indices_with_custom_output_dir(
+    mock_load_data, mock_vectorizer, mock_write_index, tmp_path
+):
     custom_output_dir = str(tmp_path / "custom_indices")
     config = {
         "input_file": str(tmp_path / "sample_data.jsonl"),
@@ -143,7 +150,9 @@ def test_build_indices_with_custom_output_dir(mock_load_data, mock_vectorizer, m
 @mock.patch("build_indices.faiss.write_index")
 @mock.patch("build_indices.Vectorizer")
 @mock.patch("build_indices.load_asqa_dataset")
-def test_build_indices_defaults_output_dir(mock_load_data, mock_vectorizer, mock_write_index, tmp_path):
+def test_build_indices_defaults_output_dir(
+    mock_load_data, mock_vectorizer, mock_write_index, tmp_path
+):
     config = {
         "input_file": str(tmp_path / "sample_data.jsonl"),
         "embedding_model": "test-model",
@@ -165,7 +174,10 @@ def test_build_indices_defaults_output_dir(mock_load_data, mock_vectorizer, mock
 @mock.patch("build_indices.Vectorizer")
 @mock.patch("build_indices.load_asqa_dataset")
 def test_build_indices_missing_config_fields(mock_load_data, mock_vectorizer, tmp_path):
-    config = {"input_file": str(tmp_path / "sample_data.jsonl"), "output_dir": str(tmp_path / "indices")}
+    config = {
+        "input_file": str(tmp_path / "sample_data.jsonl"),
+        "output_dir": str(tmp_path / "indices"),
+    }
     config_path = tmp_path / "config.json"
     with open(config_path, "w") as f:
         json.dump(config, f)
@@ -176,11 +188,16 @@ def test_build_indices_missing_config_fields(mock_load_data, mock_vectorizer, tm
 @mock.patch("build_indices.faiss.write_index")
 @mock.patch("build_indices.Vectorizer")
 @mock.patch("build_indices.load_asqa_dataset")
-def test_build_indices_empty_dataset(mock_load_data, mock_vectorizer, mock_write_index, sample_config):
+def test_build_indices_empty_dataset(
+    mock_load_data, mock_vectorizer, mock_write_index, sample_config
+):
     mock_load_data.return_value = []
 
     original_exists = os.path.exists
-    with mock.patch("os.path.exists", side_effect=lambda p: False if str(p).endswith("chunks.json") else original_exists(p)):
+    with mock.patch(
+        "os.path.exists",
+        side_effect=lambda p: False if str(p).endswith("chunks.json") else original_exists(p),
+    ):
         build_indices.main(sample_config)
 
     # write_index might be called even if empty?

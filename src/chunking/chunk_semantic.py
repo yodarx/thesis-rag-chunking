@@ -23,10 +23,10 @@ class LangChainEmbeddingWrapper:
 
 
 def chunk_semantic(
-        text: str,
-        *,
-        chunking_embeddings: EmbeddingVectorizer | str,
-        similarity_threshold: float = 0.8,
+    text: str,
+    *,
+    chunking_embeddings: EmbeddingVectorizer | str,
+    similarity_threshold: float = 0.8,
 ) -> list[str]:
     """
     Splits text based on the semantic similarity of adjacent sentences using LangChain's SemanticChunker.
@@ -48,20 +48,14 @@ def chunk_semantic(
     if not text:
         return []
 
-    # If chunking_embeddings is a string, it should have been converted to a Vectorizer by now
     if isinstance(chunking_embeddings, str):
         raise ValueError(
             f"chunking_embeddings must be an EmbeddingVectorizer instance, not a string. "
             f"Got: {chunking_embeddings}. This should be resolved by ExperimentRunner."
         )
 
-    # Wrap the vectorizer to make it compatible with LangChain
     wrapped_embeddings = LangChainEmbeddingWrapper(chunking_embeddings)
 
-    # Create the semantic chunker with percentile-based breakpoint detection
-    # Convert similarity_threshold to percentile (higher threshold = lower percentile)
-    # similarity_threshold of 0.8 means we want to split when similarity < 0.8
-    # This roughly corresponds to a percentile threshold
     breakpoint_percentile = int((1 - similarity_threshold) * 100)
 
     text_splitter = SemanticChunker(

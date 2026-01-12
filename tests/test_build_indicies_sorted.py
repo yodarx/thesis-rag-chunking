@@ -34,7 +34,9 @@ def sorted_config_and_inputs(tmp_path: Path):
     return config, dataset, out_dir, cache_dir
 
 
-def test_process_experiment_writes_sorted_cache_and_artifacts(sorted_config_and_inputs, monkeypatch):
+def test_process_experiment_writes_sorted_cache_and_artifacts(
+    sorted_config_and_inputs, monkeypatch
+):
     config, dataset, out_dir, cache_dir = sorted_config_and_inputs
     exp = config["experiments"][0]
 
@@ -97,7 +99,9 @@ def test_process_experiment_writes_sorted_cache_and_artifacts(sorted_config_and_
     assert sorted_chunks == sorted(sorted_chunks, key=len)
 
     # Verify artifacts were written to the expected index dir
-    index_dir = out_dir / build_indicies_SORTED.create_index_name(exp["name"], config["embedding_model"])
+    index_dir = out_dir / build_indicies_SORTED.create_index_name(
+        exp["name"], config["embedding_model"]
+    )
     assert (index_dir / "metadata.json").exists()
     assert (index_dir / "index.faiss").exists()
 
@@ -111,12 +115,18 @@ def test_process_experiment_skips_if_index_exists(sorted_config_and_inputs, monk
     exp = config["experiments"][0]
 
     # Create existing index marker
-    index_dir = out_dir / build_indicies_SORTED.create_index_name(exp["name"], config["embedding_model"])
+    index_dir = out_dir / build_indicies_SORTED.create_index_name(
+        exp["name"], config["embedding_model"]
+    )
     index_dir.mkdir(parents=True, exist_ok=True)
     (index_dir / "index.faiss").write_text("already-there")
 
     # Ensure we would fail if builder was called
-    monkeypatch.setattr(build_indicies_SORTED, "build_index_dynamic", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("should not build")))
+    monkeypatch.setattr(
+        build_indicies_SORTED,
+        "build_index_dynamic",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("should not build")),
+    )
 
     # Avoid tqdm
     monkeypatch.setattr(build_indicies_SORTED, "tqdm", lambda x, **kwargs: x)
@@ -132,4 +142,3 @@ def test_process_experiment_skips_if_index_exists(sorted_config_and_inputs, monk
         out_dir=str(out_dir),
         cache_dir=str(cache_dir),
     )
-

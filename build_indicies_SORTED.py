@@ -41,7 +41,8 @@ def create_index_name(exp_name: str, model_name: str) -> str:
 
 
 def load_config(config_path: str) -> dict:
-    with open(config_path) as f: return json.load(f)
+    with open(config_path) as f:
+        return json.load(f)
 
 
 def calculate_dynamic_batch_size(current_max_char_len: int, model_name: str) -> int:
@@ -101,7 +102,7 @@ def save_artifacts(index, index_dir, chunks, sorted_filename, build_time):
         "linked_cache_file": sorted_filename,
         "timestamp": datetime.now().isoformat(),
         "faiss_ntotal": index.ntotal,
-        "optimization": "sorted_dynamic_batching_fp16"
+        "optimization": "sorted_dynamic_batching_fp16",
     }
     with open(os.path.join(index_dir, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=2)
@@ -113,10 +114,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
 
     # Dummy Call für Dimension & Model Warmup
     dummy = vectorizer.embed_documents(chunks[:1], batch_size=1)
-    if hasattr(dummy, "shape"):
-        d = dummy.shape[1]
-    else:
-        d = len(dummy[0])
+    d = dummy.shape[1] if hasattr(dummy, "shape") else len(dummy[0])
 
     index = faiss.IndexScalarQuantizer(d, faiss.ScalarQuantizer.QT_fp16, faiss.METRIC_L2)
     faiss.omp_set_num_threads(32)
@@ -135,15 +133,15 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
-    LOOP_BLOCK_SIZE = 1_000
+    loop_block_size = 1_000
     total = len(chunks)
 
     pbar = tqdm(total=total, desc="🚀 Init...", unit="chunk")
     start = time.time()
 
     try:
-        for i in range(0, total, LOOP_BLOCK_SIZE):
-            end = min(i + LOOP_BLOCK_SIZE, total)
+        for i in range(0, total, loop_block_size):
+            end = min(i + loop_block_size, total)
             batch_text = chunks[i:end]
 
             # Da sortiert: Der letzte Chunk ist der längste im aktuellen Block!
@@ -152,7 +150,9 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
             # Berechne optimale Batch Size
             current_bs = calculate_dynamic_batch_size(longest_char_len, model_name)
 
-            pbar.set_description(f"🚀 Speed | MaxLen: {longest_char_len:3} | BatchSize: {current_bs:4}")
+            pbar.set_description(
+                f"🚀 Speed | MaxLen: {longest_char_len:3} | BatchSize: {current_bs:4}"
+            )
 
             # Vektorisieren
             embeddings = vectorizer.embed_documents(batch_text, batch_size=current_bs)
@@ -170,7 +170,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
             # Cleanup
             del embeddings
             # WICHTIG: Regelmäßiger Cleanup
-            if i % (LOOP_BLOCK_SIZE * 2) == 0:
+            if i % (loop_block_size * 2) == 0:
                 gc.collect()
                 torch.cuda.empty_cache()
 
@@ -257,7 +257,7 @@ def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
 
 
 def main():
-    torch.set_float32_matmul_precision('medium')
+    torch.set_float32_matmul_precision("medium")
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     parser.add_argument("--output-dir", default="data/indices")

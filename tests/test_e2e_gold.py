@@ -34,7 +34,12 @@ def e2e_gold_setup(tmp_path):
     index_dir.mkdir(parents=True, exist_ok=True)
 
     chunks = ["Chunk 1 content", "Chunk 2 content", "Chunk 3 content", "Chunk 4 content"]
-    chunks_path = index_dir / "chunks.json"
+
+    chunks_filename = "test_exp_test_exp_chunk_fixed_size_chunks_SORTED.json"
+    chunks_dir = tmp_path / "data" / "chunks"
+    chunks_dir.mkdir(parents=True, exist_ok=True)
+    chunks_path = chunks_dir / chunks_filename
+
     with open(chunks_path, "w") as f:
         json.dump(chunks, f)
 

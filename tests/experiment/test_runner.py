@@ -32,7 +32,7 @@ def sample_experiment() -> dict:
     # A dummy chunk function that splits the text
     return {
         "name": "test_exp",
-        "function": lambda text, size: [text[:size], text[size:]],
+        "function": "dummy_func",
         "params": {"size": 10},
     }
 
@@ -72,7 +72,10 @@ def test_process_single_experiment(mock_deps, sample_experiment, sample_dataset,
     mock_results.evaluate = mocker.Mock(return_value={"score": 1.0})
 
     # 2. Run the experiment logic (simulate)
-    chunk_function = sample_experiment["function"]
+    # Define local chunk function for simulation
+    def chunk_function(text, size):
+        return [text[:size], text[size:]]
+
     params = sample_experiment["params"]
     doc = sample_dataset[0]
     chunks = chunk_function(doc["document_text"], **params)

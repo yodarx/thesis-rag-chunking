@@ -41,7 +41,9 @@ def test_embed_documents_calls_model_correctly(mock_sentence_model: SentenceTran
     result = vectorizer.embed_documents(documents, batch_size)
 
     # 1. Überprüfen, ob das Modell korrekt aufgerufen wurde
-    mock_sentence_model.encode.assert_called_once_with(documents, show_progress_bar=True, batch_size=batch_size)
+    mock_sentence_model.encode.assert_called_once_with(
+        documents, show_progress_bar=True, batch_size=batch_size
+    )
 
     # 2. Überprüfen, ob das Ergebnis korrekt in eine Liste umgewandelt wurde
     expected_list = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]

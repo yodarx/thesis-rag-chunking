@@ -34,9 +34,7 @@ def main(limit: int = 10) -> None:
 
     client = initialize_llm_client()
 
-    generate_silver_for_experiment(
-        client, limit
-    )
+    generate_silver_for_experiment(client, limit)
 
 
 if __name__ == "__main__":

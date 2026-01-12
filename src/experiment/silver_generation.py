@@ -52,8 +52,8 @@ def load_documents_from_input_file(input_file: str) -> list[str]:
 
 
 def generate_silver_for_experiment(
-        llm_client: Any,
-        limit: int,
+    llm_client: Any,
+    limit: int,
 ) -> str:
     """
     Generates a silver standard dataset for a specific experiment.
@@ -81,7 +81,9 @@ def generate_silver_for_experiment(
     dataset = generator.generate_dataset(limit, num_hops=2)
 
     generation_time = datetime.datetime.now() - start_time
-    logger.info(f"Generation completed in {generation_time.total_seconds():.2f}s, generated {len(dataset)} samples")
+    logger.info(
+        f"Generation completed in {generation_time.total_seconds():.2f}s, generated {len(dataset)} samples"
+    )
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_dir = "data/silver"
@@ -90,7 +92,7 @@ def generate_silver_for_experiment(
     logger.info(f"Writing results to {output_file}")
     os.makedirs(output_dir, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
-        for idx, entry in enumerate(dataset, 1):
+        for _idx, entry in enumerate(dataset, 1):
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     logger.info(f"Successfully saved {len(dataset)} samples to {output_file}")

@@ -4,9 +4,7 @@ Tests the SilverStandardGenerator and load_documents_from_input_file functions.
 """
 
 import json
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -214,12 +212,14 @@ class TestSilverStandardGenerator:
 
     def test_parse_llm_response_valid_json(self, generator):
         """Test parsing valid JSON response."""
-        response = json.dumps({
-            "bridge_entity": "Company A",
-            "question": "What does Company A do?",
-            "answer": "Software solutions",
-            "gold_snippets": ["snippet1", "snippet2"],
-        })
+        response = json.dumps(
+            {
+                "bridge_entity": "Company A",
+                "question": "What does Company A do?",
+                "answer": "Software solutions",
+                "gold_snippets": ["snippet1", "snippet2"],
+            }
+        )
         result = generator._parse_llm_response(response)
         assert result["bridge_entity"] == "Company A"
         assert result["question"] == "What does Company A do?"
@@ -289,10 +289,13 @@ class TestSilverStandardGenerator:
         mock_llm_client.models.generate_content.return_value = mock_response
 
         # Mock random.sample to return consistent contexts
-        mocker.patch("random.sample", return_value=[
-            generator.documents[0],
-            generator.documents[1],
-        ])
+        mocker.patch(
+            "random.sample",
+            return_value=[
+                generator.documents[0],
+                generator.documents[1],
+            ],
+        )
 
         sample = generator.generate_sample(num_hops=2)
         assert sample is not None
@@ -316,10 +319,13 @@ class TestSilverStandardGenerator:
         mock_response.text = json.dumps(response_json)
         mock_llm_client.models.generate_content.return_value = mock_response
 
-        mocker.patch("random.sample", return_value=[
-            generator.documents[0],
-            generator.documents[1],
-        ])
+        mocker.patch(
+            "random.sample",
+            return_value=[
+                generator.documents[0],
+                generator.documents[1],
+            ],
+        )
 
         sample = generator.generate_sample()
         assert sample is None
@@ -336,10 +342,13 @@ class TestSilverStandardGenerator:
         mock_response.text = json.dumps(response_json)
         mock_llm_client.models.generate_content.return_value = mock_response
 
-        mocker.patch("random.sample", return_value=[
-            generator.documents[0],
-            generator.documents[1],
-        ])
+        mocker.patch(
+            "random.sample",
+            return_value=[
+                generator.documents[0],
+                generator.documents[1],
+            ],
+        )
 
         sample = generator.generate_sample()
         assert sample is None
@@ -347,10 +356,13 @@ class TestSilverStandardGenerator:
     def test_generate_sample_exception_handling(self, generator, mock_llm_client, mocker):
         """Test that exceptions during generation are caught."""
         mock_llm_client.models.generate_content.side_effect = Exception("LLM Error")
-        mocker.patch("random.sample", return_value=[
-            generator.documents[0],
-            generator.documents[1],
-        ])
+        mocker.patch(
+            "random.sample",
+            return_value=[
+                generator.documents[0],
+                generator.documents[1],
+            ],
+        )
 
         sample = generator.generate_sample()
         assert sample is None
@@ -368,10 +380,13 @@ class TestSilverStandardGenerator:
         mock_response.text = json.dumps(response_json)
         mock_llm_client.models.generate_content.return_value = mock_response
 
-        mocker.patch("random.sample", return_value=[
-            generator.documents[0],
-            generator.documents[1],
-        ])
+        mocker.patch(
+            "random.sample",
+            return_value=[
+                generator.documents[0],
+                generator.documents[1],
+            ],
+        )
 
         dataset = generator.generate_dataset(num_samples=3)
         assert len(dataset) == 3
@@ -391,10 +406,13 @@ class TestSilverStandardGenerator:
         mock_response.text = json.dumps(response_json)
         mock_llm_client.models.generate_content.return_value = mock_response
 
-        mocker.patch("random.sample", return_value=[
-            generator.documents[0],
-            generator.documents[1],
-        ])
+        mocker.patch(
+            "random.sample",
+            return_value=[
+                generator.documents[0],
+                generator.documents[1],
+            ],
+        )
 
         dataset = generator.generate_dataset(num_samples=5)
         # Should stop before reaching 5 samples due to high failure rate
@@ -412,11 +430,13 @@ class TestSilverStandardGenerator:
         mock_response.text = json.dumps(response_json)
         mock_llm_client.models.generate_content.return_value = mock_response
 
-        mocker.patch("random.sample", return_value=[
-            generator.documents[0],
-            generator.documents[1],
-        ])
+        mocker.patch(
+            "random.sample",
+            return_value=[
+                generator.documents[0],
+                generator.documents[1],
+            ],
+        )
 
         sample = generator.generate_sample()
         assert sample is None
-

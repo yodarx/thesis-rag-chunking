@@ -31,10 +31,10 @@ def load_config(json_path: str) -> dict[str, Any]:
 
 
 def run_experiments(
-        config: dict[str, Any],
-        output_dir: str,
-        timestamp: str,
-        difficulty: str | None = None,
+    config: dict[str, Any],
+    output_dir: str,
+    timestamp: str,
+    difficulty: str | None = None,
 ) -> None:
     retriever_type = config.get("retriever_type", "faiss")
     vectorizer: Vectorizer = Vectorizer.from_model_name(config["embedding_model"])
@@ -70,21 +70,16 @@ def main(config_json: str = None, difficulty: str | None = None) -> None:
 
     suffix = ""
 
-    # Derive suffix from dataset type (config-driven; replaces removed --silver flag)
     input_file = config.get("input_file")
-    if isinstance(input_file, str):
-        norm = input_file.replace("\\", "/").lower()
-        if "/silver/" in norm or norm.endswith("_silver.jsonl"):
-            suffix = "silver"
-        # Avoid misclassifying preprocessed files like data/preprocessed/gold.jsonl.
-        # Only tag as "gold" when it clearly comes from a gold dataset location or naming.
-        elif "/gold/" in norm or norm.endswith("_gold.jsonl"):
-            suffix = "gold"
-
     if difficulty:
         suffix = f"{suffix}_{difficulty}" if suffix else difficulty
 
-    # Emit a helpful message if the dataset path doesn't exist (loader returns []).
+    if input_file and isinstance(input_file, str):
+        if "silver" in input_file.lower():
+            suffix = f"{suffix}_silver" if suffix else "silver"
+        elif "gold" in input_file.lower():
+            suffix = f"{suffix}_gold" if suffix else "gold"
+
     if input_file and isinstance(input_file, str) and not os.path.exists(input_file):
         print(f"Warning: Dataset file not found: {input_file}")
 
@@ -110,7 +105,7 @@ def cli_entry() -> None:
     parser.add_argument(
         "--difficulty",
         type=str,
-        help="Filter dataset by difficulty (e.g., 'Hard', 'Medium', 'Easy')",
+        help="Filter dataset by difficulty (e.g., 'Hard', 'Moderate', 'Easy')",
     )
     args = parser.parse_args()
     main(args.config_json, difficulty=args.difficulty)

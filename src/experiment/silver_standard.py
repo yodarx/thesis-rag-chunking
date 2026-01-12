@@ -26,11 +26,15 @@ class SilverStandardGenerator:
         self.llm_client = llm_client
         self.model = "gemini-3-pro-preview"
         self.documents = documents
-        logger.debug(f"SilverStandardGenerator initialized with {len(documents)} documents and model={self.model}")
+        logger.debug(
+            f"SilverStandardGenerator initialized with {len(documents)} documents and model={self.model}"
+        )
 
     def generate_dataset(self, num_samples: int, num_hops: int = 3) -> list[dict[str, Any]]:
         """Generate a dataset of multi-hop QA pairs."""
-        logger.info(f"Starting dataset generation: target={num_samples} samples, num_hops={num_hops}")
+        logger.info(
+            f"Starting dataset generation: target={num_samples} samples, num_hops={num_hops}"
+        )
         dataset = []
         failures = 0
         max_failures = num_samples * 10
@@ -39,11 +43,15 @@ class SilverStandardGenerator:
             sample = self.generate_sample(num_hops=num_hops)
             if sample:
                 dataset.append(sample)
-                logger.debug(f"Generated sample {len(dataset)}/{num_samples}: {sample['question'][:60]}...")
+                logger.debug(
+                    f"Generated sample {len(dataset)}/{num_samples}: {sample['question'][:60]}..."
+                )
             else:
                 failures += 1
                 if failures % 5 == 0:  # Log every 5 failures
-                    logger.debug(f"Failure rate: {failures} failures, {len(dataset)}/{num_samples} successful samples")
+                    logger.debug(
+                        f"Failure rate: {failures} failures, {len(dataset)}/{num_samples} successful samples"
+                    )
                 if failures >= max_failures:
                     logger.warning(
                         f"High failure rate exceeded. Stopped after {failures} failures. "
@@ -55,7 +63,9 @@ class SilverStandardGenerator:
                     )
                     break
 
-        logger.info(f"Dataset generation complete: {len(dataset)}/{num_samples} samples generated successfully")
+        logger.info(
+            f"Dataset generation complete: {len(dataset)}/{num_samples} samples generated successfully"
+        )
         return dataset
 
     def generate_sample(self, num_hops: int = 3) -> dict[str, Any] | None:
@@ -108,14 +118,20 @@ class SilverStandardGenerator:
     def _get_random_contexts(self, n: int = 3, min_char_length: int = 100) -> list[str]:
         candidates = [doc for doc in self.documents if len(doc) >= min_char_length]
         if len(candidates) < n:
-            logger.warning(f"Requested {n} contexts but only {len(candidates)} documents meet min_char_length={min_char_length}")
+            logger.warning(
+                f"Requested {n} contexts but only {len(candidates)} documents meet min_char_length={min_char_length}"
+            )
         selected = random.sample(candidates, n) if len(candidates) >= n else candidates
-        logger.debug(f"Selected {len(selected)} contexts (min_length={min_char_length}, available={len(candidates)}/{len(self.documents)})")
+        logger.debug(
+            f"Selected {len(selected)} contexts (min_length={min_char_length}, available={len(candidates)}/{len(self.documents)})"
+        )
         return selected
 
     def _build_multihop_prompt(self, contexts: list[str]) -> str:
         """Build the prompt for multi-hop question generation with strict bridge validation."""
-        context_text = "\n\n".join([f"Context {i + 1}: {chunk}" for i, chunk in enumerate(contexts)])
+        context_text = "\n\n".join(
+            [f"Context {i + 1}: {chunk}" for i, chunk in enumerate(contexts)]
+        )
 
         return (
             f"You are an expert at creating high-quality logical reasoning datasets. "
@@ -174,8 +190,12 @@ class SilverStandardGenerator:
         cleaned_response = re.sub(r"```json\s*|\s*```", "", response).strip()
         try:
             parsed = json.loads(cleaned_response)
-            logger.debug(f"Successfully parsed LLM response: {len(cleaned_response)} chars -> {list(parsed.keys())}")
+            logger.debug(
+                f"Successfully parsed LLM response: {len(cleaned_response)} chars -> {list(parsed.keys())}"
+            )
             return parsed
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}\nResponse preview: {cleaned_response[:200]}...")
+            logger.error(
+                f"Failed to parse LLM response as JSON: {e}\nResponse preview: {cleaned_response[:200]}..."
+            )
             return {"question": "Error parsing generation", "answer": "Error parsing generation"}

@@ -46,11 +46,18 @@ class ExperimentRunner:
         else:
             self.dataset: list[dict[str, Any]] = dataset
 
-    def _get_index_paths(self, experiment_name: str) -> tuple[str, str]:
+    def _get_index_paths(self, experiment: dict[str, Any]) -> tuple[str, str]:
+        experiment_name: str = experiment["name"]
+        function_name: str = experiment["function"]
+
         index_folder_name: str = create_index_name(experiment_name, self.embedding_model_name)
         index_dir: str = os.path.join("data", "indices", index_folder_name)
         index_path: str = os.path.join(index_dir, "index.faiss")
-        chunks_path: str = os.path.join(index_dir, "chunks.json")
+
+        id_str = f"{experiment_name}_{function_name}"
+        chunks_filename = f"{experiment_name}_{id_str}_chunks_SORTED.json"
+        chunks_path: str = os.path.join("data", "chunks", chunks_filename)
+
         return index_path, chunks_path
 
     def run_all(self) -> pd.DataFrame:
@@ -61,7 +68,7 @@ class ExperimentRunner:
             exp_name: str = experiment["name"]
             print(f"\nProcessing experiment: {exp_name}")
 
-            index_path, chunks_path = self._get_index_paths(exp_name)
+            index_path, chunks_path = self._get_index_paths(experiment)
 
             if not os.path.exists(index_path) or not os.path.exists(chunks_path):
                 print(f"Warning: Index for experiment '{exp_name}' not found. Skipping.")

@@ -3,17 +3,12 @@ from typing import NamedTuple
 
 import numpy as np
 
-# --- Datenstrukturen ---
-
 
 class MatchResult(NamedTuple):
     """Speichert das Ergebnis eines Relevanz-Checks."""
 
     is_relevant: bool
     matching_gold: str | None
-
-
-# --- Haupt-Metrik-Funktion ---
 
 
 def calculate_metrics(
@@ -70,7 +65,6 @@ def calculate_metrics(
     }
 
 
-# --- Metrik-Berechnungs-Helfer ---
 def calculate_mrr(relevance_scores: list[int]) -> float:
     """Berechnet den Mean Reciprocal Rank für eine einzelne Abfrage."""
     for idx, rel in enumerate(relevance_scores, 1):
@@ -100,20 +94,17 @@ def calculate_ndcg_at_k(relevance_scores: list[int], total_gold_items: int) -> f
 
     k = len(relevance_scores)
 
-    # 1. Berechne DCG (Was wir tatsächlich erreicht haben)
     dcg: float = sum(rel / np.log2(idx + 2) for idx, rel in enumerate(relevance_scores))
 
-    # 2. Berechne IDCG (Was maximal möglich gewesen wäre)
-    # Das Ideal ist: Wir hätten 'k' Treffer, ODER alle 'total_gold_items' (falls weniger als k vorhanden sind)
     max_possible_matches = min(total_gold_items, k)
 
     if max_possible_matches == 0:
         return 0.0
 
-    # Das ideale Ranking sind lauter 1en an der Spitze: [1, 1, 1...]
     ideal_dcg: float = sum(1.0 / np.log2(idx + 2) for idx in range(max_possible_matches))
 
     return dcg / ideal_dcg if ideal_dcg > 0 else 0.0
+
 
 def calculate_precision_at_k(relevance_scores: list[int]) -> float:
     """Berechnet die Precision für die abgerufenen k Ergebnisse."""
@@ -143,12 +134,9 @@ def _get_match_results(chunks_at_k: list[str], gold_passages: list[str]) -> list
     for chunk in chunks_at_k:
         match = None
         for gold in gold_passages:
-            # Escape special regex characters
             gold_lower = gold.lower()
             safe_gold = re.escape(gold_lower)
-            # Replace escaped spaces with flexible whitespace pattern (\s+ matches any whitespace including newlines, tabs)
             flexible_gold = safe_gold.replace(r"\ ", r"\s+")
-            # Build pattern with word boundaries
             pattern = r"(?<!\w)" + flexible_gold + r"(?!\w)"
 
             if re.search(pattern, chunk.lower(), re.DOTALL):

@@ -78,7 +78,9 @@ def test_calculate_ndcg(perfect_scores, good_scores, poor_scores, no_scores):
     # Scores at k=5: [0, 0, 0, 1, 0]
     # DCG = 1/log2(5)
     # IDCG: min(1, 5) = 1, so [1] -> 1/log2(2)
-    assert calculate_ndcg_at_k(poor_scores, total_gold_items=1) == pytest.approx((1 / np.log2(5)) / (1 / np.log2(2)))
+    assert calculate_ndcg_at_k(poor_scores, total_gold_items=1) == pytest.approx(
+        (1 / np.log2(5)) / (1 / np.log2(2))
+    )
 
     assert calculate_ndcg_at_k(no_scores, total_gold_items=0) == pytest.approx(0.0)
     assert calculate_ndcg_at_k([], total_gold_items=0) == pytest.approx(0.0)
@@ -253,7 +255,9 @@ def test_word_boundary_prefix_mismatch():
     gold_passages = ["climate change"]
     metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
 
-    assert metrics["precision_at_k"] == pytest.approx(0.0), "'microclimate' sollte nicht mit 'climate change' matchen"
+    assert metrics["precision_at_k"] == pytest.approx(0.0), (
+        "'microclimate' sollte nicht mit 'climate change' matchen"
+    )
     assert metrics["recall_at_k"] == pytest.approx(0.0)
 
 
@@ -263,7 +267,9 @@ def test_word_boundary_suffix_mismatch():
     gold_passages = ["climate change"]
     metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
 
-    assert metrics["precision_at_k"] == pytest.approx(0.0), "'changes' sollte nicht mit 'climate change' matchen"
+    assert metrics["precision_at_k"] == pytest.approx(0.0), (
+        "'changes' sollte nicht mit 'climate change' matchen"
+    )
     assert metrics["recall_at_k"] == pytest.approx(0.0)
 
 
@@ -303,7 +309,9 @@ def test_word_boundary_case_insensitive():
     gold_passages = ["climate change"]
     metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
 
-    assert metrics["precision_at_k"] == pytest.approx(1.0), "Case-insensitive Match sollte funktionieren"
+    assert metrics["precision_at_k"] == pytest.approx(1.0), (
+        "Case-insensitive Match sollte funktionieren"
+    )
     assert metrics["recall_at_k"] == pytest.approx(1.0)
 
 
@@ -323,7 +331,9 @@ def test_word_boundary_special_characters():
     gold_passages = ["C++"]
     metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
 
-    assert metrics["precision_at_k"] == pytest.approx(1.0), "Spezialzeichen sollten escaped und matched werden"
+    assert metrics["precision_at_k"] == pytest.approx(1.0), (
+        "Spezialzeichen sollten escaped und matched werden"
+    )
     assert metrics["recall_at_k"] == pytest.approx(1.0)
 
 
@@ -343,7 +353,9 @@ def test_word_boundary_no_match():
     gold_passages = ["climate"]
     metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
 
-    assert metrics["precision_at_k"] == pytest.approx(0.0), "Nicht vorhandener Text sollte nicht matchen"
+    assert metrics["precision_at_k"] == pytest.approx(0.0), (
+        "Nicht vorhandener Text sollte nicht matchen"
+    )
     assert metrics["recall_at_k"] == pytest.approx(0.0)
 
 
@@ -353,7 +365,9 @@ def test_word_boundary_hyphen_separated():
     gold_passages = ["well-known"]
     metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
 
-    assert metrics["precision_at_k"] == pytest.approx(1.0), "Bindestrich-getrennte Wörter sollten matchen"
+    assert metrics["precision_at_k"] == pytest.approx(1.0), (
+        "Bindestrich-getrennte Wörter sollten matchen"
+    )
     assert metrics["recall_at_k"] == pytest.approx(1.0)
 
 
@@ -363,7 +377,9 @@ def test_word_boundary_newline_killer():
     gold_passages = ["climate change"]
     metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
 
-    assert metrics["precision_at_k"] == pytest.approx(1.0), "Zeilenumbruch zwischen Wörtern sollte matchen"
+    assert metrics["precision_at_k"] == pytest.approx(1.0), (
+        "Zeilenumbruch zwischen Wörtern sollte matchen"
+    )
     assert metrics["recall_at_k"] == pytest.approx(1.0)
 
 
@@ -383,7 +399,7 @@ def test_word_boundary_tab_indentation():
     gold_passages = ["climate change"]
     metrics = calculate_metrics(retrieved_chunks, gold_passages, k=1)
 
-    assert metrics["precision_at_k"] == pytest.approx(1.0), "Tabulator zwischen Wörtern sollte matchen"
+    assert metrics["precision_at_k"] == pytest.approx(1.0), (
+        "Tabulator zwischen Wörtern sollte matchen"
+    )
     assert metrics["recall_at_k"] == pytest.approx(1.0)
-
-

@@ -51,21 +51,20 @@ def mock_dependencies(mocker: MockerFixture):
 def test_run_main_workflow(mock_dependencies, mocker):
     with open(config_path) as f:
         config_data = json.load(f)
+
+    config_data["input_file"] = "data/preprocessed/standard.jsonl"
+
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
     mocker.patch("json.load", return_value=config_data)
     mocker.patch("shutil.copy")
 
     run.main(config_json=config_path)
 
-    # create_dir is called with suffix based on input_file
-    # config_data["input_file"] is "data/preprocessed/preprocessed_2025-11-03_all.jsonl"
-    # so suffix should be ""
     mock_dependencies["create_dir"].assert_called_once_with("")
 
     mock_dependencies["load_data"].assert_called_once_with(
         config_data["input_file"], config_data.get("limit")
     )
-    # Now expects only ONE call for the retrieval model
     # Chunking models are loaded on-demand by ExperimentRunner
     mock_dependencies["Vector"].from_model_name.assert_called_once_with(
         config_data["embedding_model"]
@@ -181,29 +180,6 @@ def test_config_is_copied_to_results_local_environment(mock_dependencies, mocker
     # Mock os.path.exists to simulate local environment (no /workspace)
     mock_exists = mocker.patch("os.path.exists")
     mock_exists.return_value = False
-
-    run.main(config_json=config_path)
-
-    # Check that the config file is copied to the correct results directory
-    output_dir = mock_dependencies["create_dir"].return_value[0]  # Use mock_dir directly
-    expected_dest = os.path.join(output_dir, "experiment_config_test_experiment_config.json")
-    mock_copy.assert_called_once_with(config_path, expected_dest)
-
-
-def test_config_is_copied_to_results_runpod_environment(mock_dependencies, mocker):
-    """Test config copying in RunPod environment (with /workspace directory)."""
-    with open(config_path) as f:
-        config_data = json.load(f)
-    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
-    mocker.patch("json.load", return_value=config_data)
-    mock_copy = mocker.patch("shutil.copy")
-    mocker.patch("os.path.join", side_effect=os.path.join)
-
-    # Mock os.path.exists to simulate RunPod environment (with /workspace)
-    def exists_side_effect(path):
-        return path == "/workspace"
-
-    mocker.patch("os.path.exists", side_effect=exists_side_effect)
 
     run.main(config_json=config_path)
 

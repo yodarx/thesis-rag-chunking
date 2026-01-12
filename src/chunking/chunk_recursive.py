@@ -9,7 +9,7 @@ def chunk_recursive(text: str, chunk_size: int, chunk_overlap: int) -> list[str]
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         model_name="gpt-3.5-turbo",
-        separators=["\n\n", "\n", " ", ""]
+        separators=["\n\n", "\n", " ", ""],
     )
 
     docs = text_splitter.create_documents([text])

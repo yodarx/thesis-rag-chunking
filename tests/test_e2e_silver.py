@@ -5,14 +5,11 @@ Tests the full pipeline of generating silver datasets.
 
 import json
 import os
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
 from src.experiment.silver_generation import generate_silver_for_experiment
-from src.experiment.silver_standard import SilverStandardGenerator
 
 
 @pytest.fixture
@@ -77,15 +74,17 @@ class TestGenerateSilverForExperiment:
 
         # Mock valid LLM responses
         valid_response = Mock()
-        valid_response.text = json.dumps({
-            "bridge_entity": "Python",
-            "question": "Who created the programming language that was released in 1989?",
-            "answer": "Guido van Rossum",
-            "gold_snippets": [
-                "Python was created by Guido van Rossum in 1989.",
-                "Guido van Rossum is a Dutch computer programmer who designed Python."
-            ]
-        })
+        valid_response.text = json.dumps(
+            {
+                "bridge_entity": "Python",
+                "question": "Who created the programming language that was released in 1989?",
+                "answer": "Guido van Rossum",
+                "gold_snippets": [
+                    "Python was created by Guido van Rossum in 1989.",
+                    "Guido van Rossum is a Dutch computer programmer who designed Python.",
+                ],
+            }
+        )
         mock_llm_client.models.generate_content.return_value = valid_response
 
         # Change to tmp directory
@@ -163,16 +162,19 @@ class TestGenerateSilverForExperiment:
         silver_dir = tmp_path / "data" / "silver"
         if silver_dir.exists():
             import shutil
+
             shutil.rmtree(silver_dir)
 
         mock_llm_client = Mock()
         valid_response = Mock()
-        valid_response.text = json.dumps({
-            "bridge_entity": "Entity",
-            "question": "Question?",
-            "answer": "Answer",
-            "gold_snippets": ["s1", "s2"]
-        })
+        valid_response.text = json.dumps(
+            {
+                "bridge_entity": "Entity",
+                "question": "Question?",
+                "answer": "Answer",
+                "gold_snippets": ["s1", "s2"],
+            }
+        )
         mock_llm_client.models.generate_content.return_value = valid_response
 
         cwd = os.getcwd()
@@ -211,14 +213,14 @@ class TestGenerateSilverForExperiment:
                 "bridge_entity": "Python",
                 "question": "Who created Python?",
                 "answer": "Guido van Rossum",
-                "gold_snippets": ["Python was created by Guido van Rossum", "Guido created Python"]
+                "gold_snippets": ["Python was created by Guido van Rossum", "Guido created Python"],
             },
             {
                 "bridge_entity": "Java",
                 "question": "Who created Java?",
                 "answer": "James Gosling",
-                "gold_snippets": ["Java was developed by James Gosling", "James created Java"]
-            }
+                "gold_snippets": ["Java was developed by James Gosling", "James created Java"],
+            },
         ]
 
         response_iter = iter(responses)
@@ -249,7 +251,7 @@ class TestGenerateSilverForExperiment:
                 lines = f.readlines()
                 assert len(lines) <= 2
 
-                for i, line in enumerate(lines):
+                for _i, line in enumerate(lines):
                     # Each line should be valid JSON
                     data = json.loads(line)
                     # Verify required fields
@@ -273,12 +275,14 @@ class TestGenerateSilverForExperiment:
 
         mock_llm_client = Mock()
         valid_response = Mock()
-        valid_response.text = json.dumps({
-            "bridge_entity": "Entity",
-            "question": "Question?",
-            "answer": "Answer",
-            "gold_snippets": ["s1", "s2"]
-        })
+        valid_response.text = json.dumps(
+            {
+                "bridge_entity": "Entity",
+                "question": "Question?",
+                "answer": "Answer",
+                "gold_snippets": ["s1", "s2"],
+            }
+        )
         mock_llm_client.models.generate_content.return_value = valid_response
 
         cwd = os.getcwd()
@@ -299,8 +303,11 @@ class TestGenerateSilverForExperiment:
             filename = os.path.basename(output_file)
             # Should match pattern: YYYY-MM-DD_HH-MM-SS_silver.jsonl
             import re
+
             pattern = r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_silver\.jsonl"
-            assert re.match(pattern, filename), f"Filename {filename} doesn't match timestamp pattern"
+            assert re.match(pattern, filename), (
+                f"Filename {filename} doesn't match timestamp pattern"
+            )
 
         finally:
             os.chdir(cwd)
@@ -327,12 +334,14 @@ class TestGenerateSilverForExperiment:
 
         mock_llm_client = Mock()
         valid_response = Mock()
-        valid_response.text = json.dumps({
-            "bridge_entity": "Entity",
-            "question": "Question?",
-            "answer": "Answer",
-            "gold_snippets": ["s1", "s2"]
-        })
+        valid_response.text = json.dumps(
+            {
+                "bridge_entity": "Entity",
+                "question": "Question?",
+                "answer": "Answer",
+                "gold_snippets": ["s1", "s2"],
+            }
+        )
         mock_llm_client.models.generate_content.return_value = valid_response
 
         cwd = os.getcwd()
@@ -368,12 +377,15 @@ class TestGenerateSilverForExperiment:
 
         mock_llm_client = Mock()
         valid_response = Mock()
-        valid_response.text = json.dumps({
-            "bridge_entity": "Concept",
-            "question": "Question with unicode: Café?",
-            "answer": "Answer with unicode: Naïve",
-            "gold_snippets": ["Snippet 1 with unicode", "Snippet 2 with more unicode"]
-        }, ensure_ascii=False)
+        valid_response.text = json.dumps(
+            {
+                "bridge_entity": "Concept",
+                "question": "Question with unicode: Café?",
+                "answer": "Answer with unicode: Naïve",
+                "gold_snippets": ["Snippet 1 with unicode", "Snippet 2 with more unicode"],
+            },
+            ensure_ascii=False,
+        )
         mock_llm_client.models.generate_content.return_value = valid_response
 
         cwd = os.getcwd()
@@ -404,12 +416,14 @@ class TestGenerateSilverForExperiment:
 
         # Always return IMPOSSIBLE (failure)
         failure_response = Mock()
-        failure_response.text = json.dumps({
-            "bridge_entity": "N/A",
-            "question": "IMPOSSIBLE",
-            "answer": "IMPOSSIBLE",
-            "gold_snippets": []
-        })
+        failure_response.text = json.dumps(
+            {
+                "bridge_entity": "N/A",
+                "question": "IMPOSSIBLE",
+                "answer": "IMPOSSIBLE",
+                "gold_snippets": [],
+            }
+        )
         mock_llm_client.models.generate_content.return_value = failure_response
 
         cwd = os.getcwd()
@@ -433,4 +447,3 @@ class TestGenerateSilverForExperiment:
 
         finally:
             os.chdir(cwd)
-

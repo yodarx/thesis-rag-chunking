@@ -65,11 +65,11 @@ def get_optimal_batch_size(model_name: str) -> int:
 
 
 def save_index(
-        index: faiss.Index,
-        index_dir: str,
-        build_time: float,
-        num_chunks: int,
-        linked_cache_filename: str
+    index: faiss.Index,
+    index_dir: str,
+    build_time: float,
+    num_chunks: int,
+    linked_cache_filename: str,
 ) -> None:
     os.makedirs(index_dir, exist_ok=True)
     print(f"Saving FAISS index (FP16) to {index_dir}...")
@@ -81,7 +81,7 @@ def save_index(
         "linked_cache_file": linked_cache_filename,
         "timestamp": datetime.now().isoformat(),
         "faiss_ntotal": index.ntotal,
-        "index_type": "IndexScalarQuantizer_FP16"
+        "index_type": "IndexScalarQuantizer_FP16",
     }
 
     with open(os.path.join(index_dir, "metadata.json"), "w", encoding="utf-8") as f:
@@ -89,7 +89,9 @@ def save_index(
 
 
 # --- THREADED INDEX BUILDER ---
-def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, gpu_batch_size: int) -> faiss.Index | None:
+def build_faiss_index(
+    chunks: list[str], vectorizer: Vectorizer, gpu_batch_size: int
+) -> faiss.Index | None:
     if not chunks:
         return None
 
@@ -116,7 +118,6 @@ def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, gpu_batch_size:
 
     index = faiss.IndexScalarQuantizer(dimension, faiss.ScalarQuantizer.QT_fp16, faiss.METRIC_L2)
     faiss.omp_set_num_threads(32)
-
 
     # --- Production path: threaded GPU/CPU pipeline ---
     result_queue = queue.Queue(maxsize=5)
@@ -172,13 +173,13 @@ def build_faiss_index(chunks: list[str], vectorizer: Vectorizer, gpu_batch_size:
 
 # --- EXPERIMENT LOOP ---
 def process_experiment(
-        experiment: dict[str, Any],
-        config: dict[str, Any],
-        dataset: list[dict[str, Any]],
-        vectorizer: Vectorizer,
-        output_dir: str,
-        cache_dir: str,
-        manual_batch_size: int,  # Kann durch CLI überschrieben werden
+    experiment: dict[str, Any],
+    config: dict[str, Any],
+    dataset: list[dict[str, Any]],
+    vectorizer: Vectorizer,
+    output_dir: str,
+    cache_dir: str,
+    manual_batch_size: int,  # Kann durch CLI überschrieben werden
 ) -> None:
     experiment_name = experiment["name"]
     id_string = f"{experiment['name']}_{experiment['function']}"
@@ -226,7 +227,7 @@ def process_experiment(
             "parameters": experiment["params"],
             "num_chunks": len(chunks),
             "chunking_duration_seconds": time.time() - chunk_start_time,
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
         }
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(chunk_metadata, f, indent=2)
@@ -273,7 +274,9 @@ def main(
 
     # Minimal config validation (keep function non-throwing for tests)
     if not input_filepath or "embedding_model" not in config or "experiments" not in config:
-        print("Error: Config is missing required fields (input_file, embedding_model, experiments).")
+        print(
+            "Error: Config is missing required fields (input_file, embedding_model, experiments)."
+        )
         return
 
     dataset = load_asqa_dataset(input_filepath, config.get("limit"))
@@ -312,6 +315,6 @@ def cli_entry() -> None:
 
 if __name__ == "__main__":
     print(f"--- Execution started at: {datetime.now()} ---")
-    torch.set_float32_matmul_precision('medium')
+    torch.set_float32_matmul_precision("medium")
     cli_entry()
     print(f"--- Execution finished at: {datetime.now()} ---")

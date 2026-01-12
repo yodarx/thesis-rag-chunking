@@ -19,7 +19,8 @@ import argparse
 import csv
 import json
 import os
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
+from collections.abc import Iterator
+from typing import Any
 
 
 def _coerce_str(value: Any) -> str:
@@ -30,7 +31,7 @@ def _coerce_str(value: Any) -> str:
     return str(value)
 
 
-def _as_list_of_strings(value: Any) -> List[str]:
+def _as_list_of_strings(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, list):
@@ -40,7 +41,7 @@ def _as_list_of_strings(value: Any) -> List[str]:
     return [str(value)]
 
 
-def _iter_json_objects(path: str, encoding: str) -> Iterator[Tuple[int, Dict[str, Any]]]:
+def _iter_json_objects(path: str, encoding: str) -> Iterator[tuple[int, dict[str, Any]]]:
     """Yield (line_number, obj) from a JSONL-like file.
 
     Supports:
@@ -52,10 +53,10 @@ def _iter_json_objects(path: str, encoding: str) -> Iterator[Tuple[int, Dict[str
 
     decoder = json.JSONDecoder()
 
-    with open(path, "r", encoding=encoding) as f:
+    with open(path, encoding=encoding) as f:
         # Fast path: try per-line JSON (true JSONL)
         start_line = 1
-        buf: List[str] = []
+        buf: list[str] = []
         for i, raw_line in enumerate(f, start=1):
             line = raw_line.strip()
             if not line:
@@ -103,12 +104,12 @@ def _iter_json_objects(path: str, encoding: str) -> Iterator[Tuple[int, Dict[str
 
 
 def _flatten_record(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     *,
     max_gold_cols: int,
-    input_file: Optional[str],
-    line_number: Optional[int],
-) -> Dict[str, Any]:
+    input_file: str | None,
+    line_number: int | None,
+) -> dict[str, Any]:
     gold_passages = _as_list_of_strings(obj.get("gold_passages"))
 
     metadata = obj.get("metadata")
@@ -117,7 +118,7 @@ def _flatten_record(
         bridge_entity = _coerce_str(metadata.get("bridge_entity"))
         # Explicitly ignore metadata.source_chunks and any other metadata keys.
 
-    row: Dict[str, Any] = {
+    row: dict[str, Any] = {
         "sample_id": _coerce_str(obj.get("sample_id")),
         "question": _coerce_str(obj.get("question")),
         "answer": _coerce_str(obj.get("answer")),
@@ -151,7 +152,7 @@ def convert_jsonl_to_csv(
 ) -> int:
     basename = os.path.basename(input_path) if include_input_file else None
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for ln, obj in _iter_json_objects(input_path, encoding=encoding):
         row = _flatten_record(
             obj,
@@ -162,7 +163,7 @@ def convert_jsonl_to_csv(
         rows.append(row)
 
     # Stable column order
-    fieldnames: List[str] = [
+    fieldnames: list[str] = [
         "sample_id",
         "question",
         "answer",
@@ -180,7 +181,9 @@ def convert_jsonl_to_csv(
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
     with open(output_path, "w", encoding=encoding, newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
+        writer = csv.DictWriter(
+            f, fieldnames=fieldnames, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL
+        )
         writer.writeheader()
         for r in rows:
             writer.writerow(r)
@@ -188,13 +191,19 @@ def convert_jsonl_to_csv(
     return len(rows)
 
 
-def main(argv: Optional[List[str]] = None) -> None:
-    parser = argparse.ArgumentParser(description="Convert silver JSONL to CSV (excluding metadata.source_chunks).")
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Convert silver JSONL to CSV (excluding metadata.source_chunks)."
+    )
     parser.add_argument("--input", required=True, help="Path to input .jsonl")
     parser.add_argument("--output", required=True, help="Path to output .csv")
     parser.add_argument("--encoding", default="utf-8", help="File encoding (default: utf-8)")
-    parser.add_argument("--delimiter", default=",", help="CSV delimiter (default: ,). Use \\t for TSV")
-    parser.add_argument("--max-gold-cols", type=int, default=3, help="How many gold_passage_* columns to emit")
+    parser.add_argument(
+        "--delimiter", default=",", help="CSV delimiter (default: ,). Use \\t for TSV"
+    )
+    parser.add_argument(
+        "--max-gold-cols", type=int, default=3, help="How many gold_passage_* columns to emit"
+    )
     parser.add_argument(
         "--no-input-file",
         action="store_true",
@@ -227,4 +236,3 @@ def main(argv: Optional[List[str]] = None) -> None:
 
 if __name__ == "__main__":
     main()
-
