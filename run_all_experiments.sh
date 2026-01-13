@@ -18,17 +18,18 @@ for config in $CONFIG_FILES; do
     echo "PROCESSING CONFIG: $config" | tee -a "$LOGFILE"
     echo "--------------------------------------------------------" | tee -a "$LOGFILE"
 
-        # Difficulties loop
-        for difficulty in "Hard" "Moderate" "Easy"; do
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] >>> RUNNING: Config=$config | Difficulty=$difficulty" | tee -a "$LOGFILE"
+    # Difficulties loop
+    for difficulty in "Hard" "Moderate" "Easy"; do
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] >>> RUNNING: Config=$config | Difficulty=$difficulty" | tee -a "$LOGFILE"
 
-            python run.py \
-                --config-json "$config" \
-                --difficulty "$difficulty" \
-                2>&1 | tee -a "$LOGFILE"
+        python run.py \
+            --config-json "$config" \
+            --difficulty "$difficulty" \
+            2>&1 | tee -a "$LOGFILE"
 
-            echo "" | tee -a "$LOGFILE"
-        done
+        echo "" | tee -a "$LOGFILE"
+    done
+done
 
 echo "========================================================" | tee -a "$LOGFILE"
 echo "ALL EXPERIMENTS FINISHED: $(date '+%Y-%m-%d %H:%M:%S')" | tee -a "$LOGFILE"
