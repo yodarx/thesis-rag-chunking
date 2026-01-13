@@ -104,6 +104,12 @@ def main(config_json: str = None, difficulty: str | None = None) -> None:
         if not os.path.exists(input_file):
             print(f"Warning: Dataset file not found: {input_file}")
 
+    # Check if results directory already exists to implement caching
+    potential_output_dir = os.path.join("results", prefix)
+    if os.path.exists(potential_output_dir):
+        print(f"Skipping experiment: Results directory '{potential_output_dir}' already exists.")
+        return
+
     output_dir = create_output_directory(prefix)
 
     config_filename = os.path.basename(config_json)

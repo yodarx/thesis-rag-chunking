@@ -212,3 +212,39 @@ def test_config_is_copied_to_results_local_environment(mock_dependencies, mocker
     output_dir = mock_dependencies["create_dir"].return_value  # Use mock_dir directly
     expected_dest = os.path.join(output_dir, "experiment_config_test_experiment_config.json")
     mock_copy.assert_called_once_with(config_path, expected_dest)
+
+
+def test_run_caching_skips_execution(mock_dependencies, mocker, capsys):
+    """Test that execution is skipped if the results directory already exists."""
+    with open(config_path) as f:
+        config_data = json.load(f)
+
+    # We set input_file to 'gold.jsonl' implies prefix 'test-model_test_experiment_config_gold'
+
+    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
+    mocker.patch("json.load", return_value=config_data)
+
+    # Mock os.path.exists
+    mock_exists = mocker.patch("os.path.exists")
+
+    def side_effect(path):
+        # Check if checking for results directory
+        if "results" in path and "test-model_test_experiment_config_gold" in path:
+            return True
+        return False
+
+    mock_exists.side_effect = side_effect
+
+    run.main(config_json=config_path)
+
+    # Verify that create_output_directory was NOT called (so no new results dir)
+    mock_dependencies["create_dir"].assert_not_called()
+
+    # Verify processing was skipped (Runner not initialized)
+    mock_dependencies["Runner"].assert_not_called()
+
+    # Verify message
+    captured = capsys.readouterr()
+    assert "Skipping experiment" in captured.out
+    assert "already exists" in captured.out
+
