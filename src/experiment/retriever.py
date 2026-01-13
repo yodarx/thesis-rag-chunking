@@ -30,7 +30,7 @@ class FaissRetriever:
                 "Index is not built or loaded. Call build_index() or load_index() first."
             )
         query_embedding: np.ndarray = np.array(self.vectorizer.embed_documents([query])).astype(
-            "float32"
+            "float16"
         )
         k_for_search: int = min(top_k, self.index.ntotal)
         distances, indices = self.index.search(query_embedding, k_for_search)
