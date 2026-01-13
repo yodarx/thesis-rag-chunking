@@ -155,7 +155,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
             )
 
             # Vektorisieren
-            embeddings = vectorizer.embed_documents(batch_text, batch_size=current_bs)
+            embeddings = vectorizer.embed_documents(batch_text, batch_size=current_bs,convert_to_numpy=true)
 
             # WICHTIG: Sofort von GPU lösen falls Tensor
             if isinstance(embeddings, torch.Tensor):

@@ -40,7 +40,11 @@ class FaissRetriever:
             raise RuntimeError("Index is not built or loaded.")
 
         # 1. Vektorisieren
-        query_embeddings = self.vectorizer.embed_documents(queries, batch_size=len(queries))
+        query_embeddings = self.vectorizer.embed_documents(
+            queries,
+            batch_size=len(queries),
+            convert_to_numpy=True
+        )
 
         # --- FIX: Sicherheits-Konvertierung falls Liste kommt ---
         if isinstance(query_embeddings, list):
