@@ -1,6 +1,8 @@
 import json
+
 import faiss
 import numpy as np
+
 from src.vectorizer.vectorizer import Vectorizer
 
 
@@ -34,17 +36,22 @@ class FaissRetriever:
         return self.retrieve_batch([query], top_k)[0]
 
     def retrieve_batch(self, queries: list[str], top_k: int) -> list[list[str]]:
-        """
-        Der Turbo-Modus: Verarbeitet viele Fragen gleichzeitig auf der GPU.
-        """
         if self.index is None:
             raise RuntimeError("Index is not built or loaded.")
 
+        # 1. Vektorisieren
         query_embeddings = self.vectorizer.embed_documents(queries, batch_size=len(queries))
 
+        # --- FIX: Sicherheits-Konvertierung falls Liste kommt ---
+        if isinstance(query_embeddings, list):
+            query_embeddings = np.array(query_embeddings)
+        # -------------------------------------------------------
+
+        # 2. Float32 Check
         if query_embeddings.dtype != "float32":
             query_embeddings = query_embeddings.astype("float32")
 
+        # 3. FAISS Suche
         k_for_search: int = min(top_k, self.index.ntotal)
         distances, indices = self.index.search(query_embeddings, k_for_search)
 
