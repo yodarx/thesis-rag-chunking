@@ -16,13 +16,12 @@ from src.vectorizer.vectorizer import Vectorizer
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 
-def create_output_directory(prefix: str = "") -> tuple[str, str]:
-    timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    folder_name = f"{prefix}_{timestamp}" if prefix else timestamp
+def create_output_directory(prefix: str = "") -> str:
+    folder_name = prefix if prefix else "experiment_results"
     output_dir: str = os.path.join("results", folder_name)
     os.makedirs(output_dir, exist_ok=True)
     print(f"Results for this run will be saved in '{output_dir}'.")
-    return output_dir, timestamp
+    return output_dir
 
 
 def load_config(json_path: str) -> dict[str, Any]:
@@ -93,6 +92,9 @@ def run_experiments(
 
 
 def main(config_json: str = None, difficulty: str | None = None) -> None:
+    start_time = datetime.now()
+    timestamp_str = start_time.strftime("%Y-%m-%d_%H-%M-%S")
+
     config = load_config(config_json)
 
     prefix = generate_experiment_prefix(config, config_json, difficulty)
@@ -102,13 +104,24 @@ def main(config_json: str = None, difficulty: str | None = None) -> None:
         if not os.path.exists(input_file):
             print(f"Warning: Dataset file not found: {input_file}")
 
-    output_dir, timestamp = create_output_directory(prefix)
+    output_dir = create_output_directory(prefix)
 
     config_filename = os.path.basename(config_json)
     dest_path = os.path.join(output_dir, f"experiment_config_{config_filename}")
     shutil.copy(config_json, dest_path)
 
-    run_experiments(config, output_dir, timestamp, difficulty=difficulty)
+    run_experiments(config, output_dir, timestamp_str, difficulty=difficulty)
+
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
+
+    metadata = {
+        "timestamp": start_time.isoformat(),
+        "duration_seconds": duration,
+        "duration_human": str(end_time - start_time),
+    }
+    with open(os.path.join(output_dir, "metadata.json"), "w") as f:
+        json.dump(metadata, f, indent=2)
 
 
 def cli_entry() -> None:

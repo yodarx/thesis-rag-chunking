@@ -24,8 +24,18 @@ def mock_dependencies(mocker: MockerFixture):
     mock_create_dir = mocker.patch("run.create_output_directory")
 
     # Konfiguriere Rückgabewerte
-    mock_create_dir.return_value = ("mock_dir", "mock_ts")
+    mock_create_dir.return_value = "mock_dir"
     mock_load_data.return_value = [{"id": 1}]
+
+    # Mock datetime to control timestamp in main()
+    mock_dt = mocker.patch("run.datetime")
+    mock_now = mocker.MagicMock()
+    mock_dt.now.return_value = mock_now
+    mock_now.strftime.return_value = "mock_ts"
+    mock_now.isoformat.return_value = "2024-01-01T12:00:00"
+    # duration calculation
+    mock_now.__sub__.return_value.total_seconds.return_value = 10.0
+    mock_now.__sub__.return_value.__str__.return_value = "0:00:10"
 
     # Mocke die Instanzen, die von den Konstruktoren zurückgegeben werden
     mock_runner_inst = mock_runner_cls.return_value
@@ -199,6 +209,6 @@ def test_config_is_copied_to_results_local_environment(mock_dependencies, mocker
     run.main(config_json=config_path)
 
     # Check that the config file is copied to the correct results directory
-    output_dir = mock_dependencies["create_dir"].return_value[0]  # Use mock_dir directly
+    output_dir = mock_dependencies["create_dir"].return_value  # Use mock_dir directly
     expected_dest = os.path.join(output_dir, "experiment_config_test_experiment_config.json")
     mock_copy.assert_called_once_with(config_path, expected_dest)

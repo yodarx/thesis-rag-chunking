@@ -106,7 +106,7 @@ def test_e2e_gold_pipeline(e2e_gold_setup):
         # Setup output directory mock
         results_dir = tmp_path / "results"
         results_dir.mkdir()
-        mock_create_out.return_value = (str(results_dir), "test_timestamp")
+        mock_create_out.return_value = str(results_dir)
 
         # Run the experiment runner
         cwd = os.getcwd()
@@ -119,8 +119,14 @@ def test_e2e_gold_pipeline(e2e_gold_setup):
             files = list(results_dir.glob("*"))
             assert len(files) > 0, "No results files generated"
 
-            detailed_csv = results_dir / "test_timestamp_detailed_results.csv"
-            assert detailed_csv.exists(), "Detailed results CSV not found"
+            # Check validation of metadata.json
+            metadata_file = results_dir / "metadata.json"
+            assert metadata_file.exists(), "metadata.json not found"
+
+            # Find detailed results csv (timestamp varies)
+            detailed_csv_candidates = list(results_dir.glob("*_detailed_results.csv"))
+            assert len(detailed_csv_candidates) == 1, "Detailed results CSV not found or multiple found"
+            detailed_csv = detailed_csv_candidates[0]
 
             # Check content of detailed results
             with open(detailed_csv) as f:
@@ -179,8 +185,8 @@ def test_e2e_run_with_difficulty(e2e_gold_setup):
 
         results_dir = tmp_path / "results"
         results_dir.mkdir(exist_ok=True)
-        # Mock returns (dir, timestamp)
-        mock_create_out.return_value = (str(results_dir), "difficult_ts")
+        # Mock returns (dir, timestamp) -> now just dir
+        mock_create_out.return_value = str(results_dir)
 
         cwd = os.getcwd()
         os.chdir(tmp_path)
@@ -222,7 +228,7 @@ def test_e2e_silver_missing_dataset(e2e_gold_setup, caplog):
     with patch("run.Vectorizer"), patch("run.create_output_directory") as mock_create_out:
         results_dir = tmp_path / "results"
         results_dir.mkdir(exist_ok=True)
-        mock_create_out.return_value = (str(results_dir), "test_ts")
+        mock_create_out.return_value = str(results_dir)
 
         cwd = os.getcwd()
         os.chdir(tmp_path)
