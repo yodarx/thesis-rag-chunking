@@ -1,7 +1,5 @@
  #!/bin/bash
 
-# Script to run all experiments with all difficulties against Gold and Silver datasets
-
 LOGFILE="results/run_all_experiments_$(date +%Y%m%d_%H%M%S).log"
 
 echo ">>> Logging started: $LOGFILE"
@@ -11,7 +9,7 @@ echo "========================================================" | tee -a "$LOGFI
 echo "" | tee -a "$LOGFILE"
 
 # Find all config files, excluding _archive and hidden files
-CONFIG_FILES=$(find configs -name "*.json" -not -path "*/_archive/*" -not -path "*/.*" | sort)
+CONFIG_FILES=$(find configs -name "*.json" -not -name "00_sanity_check.json" -not -path "*/_archive/*" -not -path "*/.*" | sort)
 
 for config in $CONFIG_FILES; do
     echo "--------------------------------------------------------" | tee -a "$LOGFILE"
