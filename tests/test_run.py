@@ -39,6 +39,7 @@ def mock_dependencies(mocker: MockerFixture):
 
     # Mocke die Instanzen, die von den Konstruktoren zurückgegeben werden
     mock_runner_inst = mock_runner_cls.return_value
+    mock_runner_inst.dataset = []  # Ensure dataset attr exists for len() check
 
     # Konfiguriere den Runner, ein (Mock) Summary-DataFrame zurückzugeben
     mock_summary_df = mocker.Mock(spec=pd.DataFrame)

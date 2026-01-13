@@ -16,17 +16,31 @@ for config in $CONFIG_FILES; do
     echo "PROCESSING CONFIG: $config" | tee -a "$LOGFILE"
     echo "--------------------------------------------------------" | tee -a "$LOGFILE"
 
-    # Difficulties loop
-    for difficulty in "Hard" "Moderate" "Easy"; do
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] >>> RUNNING: Config=$config | Difficulty=$difficulty" | tee -a "$LOGFILE"
+    # Extract filename to check for silver status
+    config_filename=$(basename "$config")
+
+    # Check if config filename is silver (case insensitive check)
+    if [[ "$config_filename" == *"SILVER"* ]] || [[ "$config_filename" == *"silver"* ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] >>> RUNNING SILVER: Config=$config" | tee -a "$LOGFILE"
 
         python run.py \
             --config-json "$config" \
-            --difficulty "$difficulty" \
             2>&1 | tee -a "$LOGFILE"
 
         echo "" | tee -a "$LOGFILE"
-    done
+    else
+        # Difficulties loop for non-silver configs
+        for difficulty in "Hard" "Moderate" "Easy"; do
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] >>> RUNNING: Config=$config | Difficulty=$difficulty" | tee -a "$LOGFILE"
+
+            python run.py \
+                --config-json "$config" \
+                --difficulty "$difficulty" \
+                2>&1 | tee -a "$LOGFILE"
+
+            echo "" | tee -a "$LOGFILE"
+        done
+    fi
 done
 
 echo "========================================================" | tee -a "$LOGFILE"

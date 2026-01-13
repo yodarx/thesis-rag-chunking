@@ -61,7 +61,7 @@ def run_experiments(
     output_dir: str,
     timestamp: str,
     difficulty: str | None = None,
-) -> None:
+) -> int:
     retriever_type = config.get("retriever_type", "faiss")
     vectorizer: Vectorizer = Vectorizer.from_model_name(config["embedding_model"])
 
@@ -90,6 +90,8 @@ def run_experiments(
     else:
         print("No summary DataFrame to visualize.")
 
+    return len(runner.dataset)
+
 
 def main(config_json: str = None, difficulty: str | None = None) -> None:
     start_time = datetime.now()
@@ -116,7 +118,7 @@ def main(config_json: str = None, difficulty: str | None = None) -> None:
     dest_path = os.path.join(output_dir, f"experiment_config_{config_filename}")
     shutil.copy(config_json, dest_path)
 
-    run_experiments(config, output_dir, timestamp_str, difficulty=difficulty)
+    dataset_size = run_experiments(config, output_dir, timestamp_str, difficulty=difficulty)
 
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
@@ -125,6 +127,7 @@ def main(config_json: str = None, difficulty: str | None = None) -> None:
         "timestamp": start_time.isoformat(),
         "duration_seconds": duration,
         "duration_human": str(end_time - start_time),
+        "dataset_size": dataset_size,
     }
     with open(os.path.join(output_dir, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=2)
