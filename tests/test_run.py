@@ -60,7 +60,7 @@ def test_run_main_workflow(mock_dependencies, mocker):
 
     run.main(config_json=config_path)
 
-    mock_dependencies["create_dir"].assert_called_once_with("")
+    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_standard")
 
     mock_dependencies["load_data"].assert_called_once_with(
         config_data["input_file"], config_data.get("limit")
@@ -90,7 +90,7 @@ def test_run_main_silver_suffix(mock_dependencies, mocker):
 
     run.main(config_json=config_path)
 
-    mock_dependencies["create_dir"].assert_called_once_with("silver")
+    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_test_silver")
 
 
 def test_run_main_gold_suffix(mock_dependencies, mocker):
@@ -104,7 +104,7 @@ def test_run_main_gold_suffix(mock_dependencies, mocker):
 
     run.main(config_json=config_path)
 
-    mock_dependencies["create_dir"].assert_called_once_with("gold")
+    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_test_gold")
 
 
 def test_run_main_silver_dataset(mock_dependencies, mocker):
@@ -121,10 +121,25 @@ def test_run_main_silver_dataset(mock_dependencies, mocker):
 
     run.main(config_json=config_path)
 
-    mock_dependencies["create_dir"].assert_called_once_with("silver")
+    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_test_silver")
     mock_dependencies["load_data"].assert_called_with(
         "data/silver/test_silver.jsonl", config_data.get("limit")
     )
+
+
+def test_run_main_with_difficulty(mock_dependencies, mocker):
+    with open(config_path) as f:
+        config_data = json.load(f)
+    config_data["input_file"] = "data/preprocessed/standard.jsonl"
+
+    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
+    mocker.patch("json.load", return_value=config_data)
+    mocker.patch("shutil.copy")
+
+    run.main(config_json=config_path, difficulty="Hard")
+
+    # expected format: $embedding_$experimentName_$usedInputFile_$difficulty
+    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_standard_Hard")
 
 
 def test_run_main_no_data(mock_dependencies, mocker):

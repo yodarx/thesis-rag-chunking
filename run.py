@@ -16,9 +16,9 @@ from src.vectorizer.vectorizer import Vectorizer
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 
-def create_output_directory(suffix: str = "") -> tuple[str, str]:
+def create_output_directory(prefix: str = "") -> tuple[str, str]:
     timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    folder_name = f"{timestamp}_{suffix}" if suffix else timestamp
+    folder_name = f"{prefix}_{timestamp}" if prefix else timestamp
     output_dir: str = os.path.join("results", folder_name)
     os.makedirs(output_dir, exist_ok=True)
     print(f"Results for this run will be saved in '{output_dir}'.")
@@ -28,6 +28,33 @@ def create_output_directory(suffix: str = "") -> tuple[str, str]:
 def load_config(json_path: str) -> dict[str, Any]:
     with open(json_path) as f:
         return json.load(f)
+
+
+def generate_experiment_prefix(
+    config: dict[str, Any], config_path: str, difficulty: str | None = None
+) -> str:
+    """
+    Construct output directory prefix based on experiment parameters.
+    Format: $embedding_$experimentName_$usedInputFile_$difficulty
+    """
+    embedding_model = config.get("embedding_model", "unknown").replace("/", "_")
+    experiment_name = (
+        os.path.splitext(os.path.basename(config_path))[0]
+        if config_path
+        else "unknown_experiment"
+    )
+
+    input_file = config.get("input_file")
+    if input_file and isinstance(input_file, str):
+        input_file_name = os.path.splitext(os.path.basename(input_file))[0]
+    else:
+        input_file_name = "unknown_input"
+
+    parts = [embedding_model, experiment_name, input_file_name]
+    if difficulty:
+        parts.append(difficulty)
+
+    return "_".join(parts)
 
 
 def run_experiments(
@@ -68,22 +95,14 @@ def run_experiments(
 def main(config_json: str = None, difficulty: str | None = None) -> None:
     config = load_config(config_json)
 
-    suffix = ""
+    prefix = generate_experiment_prefix(config, config_json, difficulty)
 
-    input_file = config.get("input_file")
-    if difficulty:
-        suffix = f"{suffix}_{difficulty}" if suffix else difficulty
+    if config.get("input_file") and isinstance(config["input_file"], str):
+        input_file = config["input_file"]
+        if not os.path.exists(input_file):
+            print(f"Warning: Dataset file not found: {input_file}")
 
-    if input_file and isinstance(input_file, str):
-        if "silver" in input_file.lower():
-            suffix = f"{suffix}_silver" if suffix else "silver"
-        elif "gold" in input_file.lower():
-            suffix = f"{suffix}_gold" if suffix else "gold"
-
-    if input_file and isinstance(input_file, str) and not os.path.exists(input_file):
-        print(f"Warning: Dataset file not found: {input_file}")
-
-    output_dir, timestamp = create_output_directory(suffix)
+    output_dir, timestamp = create_output_directory(prefix)
 
     config_filename = os.path.basename(config_json)
     dest_path = os.path.join(output_dir, f"experiment_config_{config_filename}")

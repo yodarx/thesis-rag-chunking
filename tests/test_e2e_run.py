@@ -113,6 +113,7 @@ def test_e2e_gold_pipeline(e2e_gold_setup):
         os.chdir(tmp_path)
         try:
             run.main(str(config_path))
+            mock_create_out.assert_called_once_with("dummy-model_config_gold")
 
             # Verify results
             files = list(results_dir.glob("*"))
@@ -126,6 +127,73 @@ def test_e2e_gold_pipeline(e2e_gold_setup):
                 content = f.read()
                 assert "What is in Chunk 1?" in content
                 assert "gold_1" in content
+
+        finally:
+            os.chdir(cwd)
+
+
+def test_e2e_run_with_difficulty(e2e_gold_setup):
+    """
+    End-to-End test for execution with difficulty filter.
+    Verifies that the output directory includes the difficulty suffix.
+    """
+    config_path, tmp_path = e2e_gold_setup
+
+    # Create dataset
+    gold_data = [
+        {
+            "sample_id": "gold_1",
+            "question": "Easy Q",
+            "gold_passages": ["Chunk 1 content"],
+            "category": "Factoid",
+            "difficulty": "Easy",
+        },
+        {
+            "sample_id": "gold_2",
+            "question": "Hard Q",
+            "gold_passages": ["Chunk 2 content"],
+            "category": "Factoid",
+            "difficulty": "Hard",
+        },
+    ]
+    gold_path = tmp_path / "data" / "gold.jsonl"
+    gold_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(gold_path, "w") as f:
+        for entry in gold_data:
+            f.write(json.dumps(entry) + "\n")
+
+    # Update config
+    with open(config_path) as f:
+        config = json.load(f)
+    config["input_file"] = str(gold_path)
+    with open(config_path, "w") as f:
+        json.dump(config, f)
+
+    # Mock Vectorizer and create output
+    with (
+        patch("run.Vectorizer") as mock_vectorizer_run,
+        patch("run.create_output_directory") as mock_create_out,
+    ):
+        mock_vectorizer_instance = mock_vectorizer_run.from_model_name.return_value
+        mock_vectorizer_instance.embed_documents.return_value = np.random.rand(1, 10).tolist()
+
+        results_dir = tmp_path / "results"
+        results_dir.mkdir(exist_ok=True)
+        # Mock returns (dir, timestamp)
+        mock_create_out.return_value = (str(results_dir), "difficult_ts")
+
+        cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            # Run with difficulty="Hard"
+            run.main(str(config_path), difficulty="Hard")
+
+            # Verify prefix logic
+            # embedding: dummy-model
+            # experiment: config
+            # input: gold
+            # difficulty: Hard
+            mock_create_out.assert_called_once_with("dummy-model_config_gold_Hard")
 
         finally:
             os.chdir(cwd)
@@ -168,6 +236,12 @@ def test_e2e_silver_missing_dataset(e2e_gold_setup, caplog):
             sys.stdout = captured_output
 
             run.main(str(config_path))
+
+            # Verify prefix logic
+            # embedding: dummy-model
+            # experiment: config (from config.json)
+            # input: test_exp_dummy-model_silver (from test_exp_dummy-model_silver.jsonl)
+            mock_create_out.assert_called_once_with("dummy-model_config_test_exp_dummy-model_silver")
 
             sys.stdout = old_stdout
             output = captured_output.getvalue()
