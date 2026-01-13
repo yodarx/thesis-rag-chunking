@@ -128,6 +128,14 @@ def main(config_json: str = None, difficulty: str | None = None) -> None:
         "duration_seconds": duration,
         "duration_human": str(end_time - start_time),
         "dataset_size": dataset_size,
+        "difficulty": difficulty,
+        "config_file": config_filename,
+        "embedding_model": config.get("embedding_model"),
+        "input_file": config.get("input_file"),
+        "retriever_type": config.get("retriever_type"),
+        "top_k": config.get("top_k"),
+        "limit": config.get("limit"),
+        "experiments": [e.get("name") for e in config.get("experiments", [])],
     }
     with open(os.path.join(output_dir, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=2)

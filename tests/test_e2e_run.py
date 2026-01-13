@@ -123,6 +123,12 @@ def test_e2e_gold_pipeline(e2e_gold_setup):
             metadata_file = results_dir / "metadata.json"
             assert metadata_file.exists(), "metadata.json not found"
 
+            with open(metadata_file) as f:
+                metadata = json.load(f)
+                assert "dataset_size" in metadata, "dataset_size missing from metadata"
+                assert metadata["embedding_model"] == "dummy-model", "Incorrect embedding model in metadata"
+                assert "experiments" in metadata, "Experiments list missing from metadata"
+
             # Find detailed results csv (timestamp varies)
             detailed_csv_candidates = list(results_dir.glob("*_detailed_results.csv"))
             assert len(detailed_csv_candidates) == 1, "Detailed results CSV not found or multiple found"
