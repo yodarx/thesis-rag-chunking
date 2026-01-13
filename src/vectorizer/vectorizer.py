@@ -31,7 +31,7 @@ class Vectorizer:
         # Tests expect CPU to be represented as "None" for SentenceTransformer(device=...)
         return None
 
-    def embed_documents(self, documents: list[str], batch_size: int = 32) -> list[list[float]]:
+    def embed_documents(self, documents: list[str], batch_size: int = 2048) -> list[list[float]]:
         """Convert a list of documents to embeddings.
 
         Tests in this repo expect:
@@ -48,9 +48,7 @@ class Vectorizer:
             batch_size=batch_size,
         )
 
-        # SentenceTransformer typically returns a numpy array; normalize to list[list[float]]
         if isinstance(embeddings, np.ndarray):
             return embeddings.tolist()
 
-        # Fall back: already list-like
         return list(embeddings)
