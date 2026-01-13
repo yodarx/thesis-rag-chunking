@@ -1,4 +1,5 @@
 import argparse
+import glob
 import json
 import os
 import shutil
@@ -109,8 +110,10 @@ def main(config_json: str = None, difficulty: str | None = None) -> None:
     # Check if results directory already exists to implement caching
     potential_output_dir = os.path.join("results", prefix)
     if os.path.exists(potential_output_dir):
-        print(f"Skipping experiment: Results directory '{potential_output_dir}' already exists.")
-        return
+        # Check if a completed result file exists
+        if glob.glob(os.path.join(potential_output_dir, "*_detailed_results.csv")):
+            print(f"Skipping experiment: Results directory '{potential_output_dir}' already exists and contains detailed results.")
+            return
 
     output_dir = create_output_directory(prefix)
 

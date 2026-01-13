@@ -236,7 +236,14 @@ def test_run_caching_skips_execution(mock_dependencies, mocker, capsys):
 
     mock_exists.side_effect = side_effect
 
+    # Mock glob.glob to return a list (files found)
+    mock_glob = mocker.patch("glob.glob")
+    mock_glob.return_value = ["dummy_detailed_results.csv"]
+
     run.main(config_json=config_path)
+
+    # Verify that glob.glob was called
+    mock_glob.assert_called()
 
     # Verify that create_output_directory was NOT called (so no new results dir)
     mock_dependencies["create_dir"].assert_not_called()
@@ -248,4 +255,30 @@ def test_run_caching_skips_execution(mock_dependencies, mocker, capsys):
     captured = capsys.readouterr()
     assert "Skipping experiment" in captured.out
     assert "already exists" in captured.out
+
+
+def test_run_caching_does_not_skip_if_incomplete(mock_dependencies, mocker, capsys):
+    """Test that execution proceeds if the results directory exists but has no detailed results file."""
+    with open(config_path) as f:
+        config_data = json.load(f)
+
+    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
+    mocker.patch("json.load", return_value=config_data)
+    mocker.patch("shutil.copy")
+
+    # Mock os.path.exists - dir exists
+    mock_exists = mocker.patch("os.path.exists")
+    mock_exists.return_value = True
+
+    # Mock glob.glob to return empty list (incomplete run)
+    mock_glob = mocker.patch("glob.glob")
+    mock_glob.return_value = []
+
+    # Should run anyway
+    run.main(config_json=config_path)
+
+    # create_output_directory IS called
+    mock_dependencies["create_dir"].assert_called()
+    # Runner IS called
+    mock_dependencies["Runner"].assert_called()
 
