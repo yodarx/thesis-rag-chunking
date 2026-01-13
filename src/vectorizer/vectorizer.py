@@ -31,7 +31,7 @@ class Vectorizer:
         # Tests expect CPU to be represented as "None" for SentenceTransformer(device=...)
         return None
 
-    def embed_documents(self, documents: list[str], batch_size: int) -> list[list[float]]:
+    def embed_documents(self, documents: list[str], batch_size: int = 32) -> list[list[float]]:
         """Convert a list of documents to embeddings.
 
         Tests in this repo expect:
