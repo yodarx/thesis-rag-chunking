@@ -67,9 +67,18 @@ def test_generate_chunks_and_cache(mock_get_func, tmp_path, mock_dataset, mock_v
     cache_path = exp_dir / "chunks.json"
     assert cache_path.exists()
 
+    # Check sorted chunks file created
+    sorted_cache_path = exp_dir / "chunks_SORTED.json"
+    assert sorted_cache_path.exists()
+
     with open(cache_path) as f:
         data = json.load(f)
         assert data == chunks
+
+    with open(sorted_cache_path) as f:
+        sorted_data = json.load(f)
+        assert len(sorted_data) == len(chunks)
+        assert sorted_data == sorted(chunks, key=len)
 
     mock_chunk_func.assert_called_with("doc2", size=100)
 

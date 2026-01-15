@@ -1,9 +1,0 @@
-experiment,mrr,map,ndcg_at_k,precision_at_k,recall_at_k,f1_score_at_k
-fixed_256_25,0.0,0.0,0.0,0.0,0.0,0.0
-fixed_512_50,0.0,0.0,0.0,0.0,0.0,0.0
-recursive_256_25,0.0,0.0,0.0,0.0,0.0,0.0
-recursive_512_50,0.0,0.0,0.0,0.0,0.0,0.0
-semantic_t0.7_miniLM,0.0,0.0,0.0,0.0,0.0,0.0
-semantic_t0.85_miniLM,0.0,0.0,0.0,0.0,0.0,0.0
-sentence_s3,0.0,0.0,0.0,0.0,0.0,0.0
-sentence_s5,0.0,0.0,0.0,0.0,0.0,0.0

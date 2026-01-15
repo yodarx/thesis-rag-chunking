@@ -51,7 +51,17 @@ def generate_chunks(
     if os.path.exists(cache_path):
         print(f"[{name}] Lade Chunks aus Cache...")
         with open(cache_path) as f:
-            return json.load(f)
+            chunks = json.load(f)
+
+        # Ensure sorted chunks exist (backfill if missing from cache)
+        sorted_cache_path = os.path.join(exp_dir, "chunks_SORTED.json")
+        if not os.path.exists(sorted_cache_path):
+            print(f"[{name}] Sorted chunks missing. Generating sorted file...")
+            sorted_chunks = sorted(chunks, key=len)
+            with open(sorted_cache_path, "w") as f:
+                json.dump(sorted_chunks, f)
+
+        return chunks
 
     print(f"[{name}] ⚠️ Cache Miss! Generiere Chunks...")
     chunk_func = get_chunking_function(func_name)
@@ -96,6 +106,13 @@ def generate_chunks(
 
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2)
+
+    # Save sorted chunks
+    sorted_cache_path = os.path.join(exp_dir, "chunks_SORTED.json")
+    print(f"[{name}] Saving sorted chunks to {sorted_cache_path}...")
+    sorted_chunks = sorted(chunks, key=len)
+    with open(sorted_cache_path, "w") as f:
+        json.dump(sorted_chunks, f)
 
     return chunks
 

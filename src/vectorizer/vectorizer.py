@@ -10,7 +10,7 @@ class Vectorizer:
 
     @classmethod
     def from_model_name(cls, model_name: str = "all-MiniLM-L6-v2") -> "Vectorizer":
-        device = cls._get_device()
+        device = cls.get_device()
         print(f"Selected device for SentenceTransformer: {device if device else 'cpu'}")
 
         loaded_model = SentenceTransformer(model_name, device=device)
@@ -21,7 +21,6 @@ class Vectorizer:
             loaded_model.half()
 
         # 2. TORCH COMPILE (Turbo für Nvidia L4 / A100)
-        # Das beschleunigt die Inference massiv, funktioniert aber nur mit neueren PyTorch Versionen
         if hasattr(torch, "compile") and device == "cuda":
             try:
                 print("Compiling model with torch.compile for max speed...")
@@ -32,7 +31,7 @@ class Vectorizer:
         return cls(loaded_model)
 
     @staticmethod
-    def _get_device() -> str | None:
+    def get_device() -> str | None:
         if torch.cuda.is_available():
             return "cuda"
         if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
@@ -43,7 +42,7 @@ class Vectorizer:
             self,
             documents: list[str],
             batch_size: int = 2048,
-            convert_to_numpy: bool = False  # <--- HIER IST DER TRICK
+            convert_to_numpy: bool = False
     ) -> list[list[float]] | np.ndarray:
         """
         Convert a list of documents to embeddings.
@@ -58,19 +57,15 @@ class Vectorizer:
             # Return empty structure matching the requested type
             return np.empty((0, 0), dtype=np.float32) if convert_to_numpy else []
 
-        # WICHTIG: Wir lassen SentenceTransformer IMMER Numpy erstellen (intern effizienter)
-        # und wandeln es nur am Ende um, wenn nötig.
         embeddings = self.model.encode(
             documents,
-            show_progress_bar=False,  # Progress Bar machen wir lieber extern (tqdm)
+            show_progress_bar=False,
             batch_size=batch_size,
-            convert_to_numpy=True,  # Immer True für interne Performance
-            normalize_embeddings=True  # Optional: Oft besser für RAG
+            convert_to_numpy=True,
+            normalize_embeddings=True
         )
 
-        # Wenn der Aufrufer (Index Builder / Runner) Numpy will -> direkt zurückgeben
         if convert_to_numpy:
-            return embeddings.astype("float32")  # Sicherstellen für FAISS
+            return embeddings.astype("float32")
 
-        # Wenn deine Tests Listen wollen (Standardverhalten) -> umwandeln
         return embeddings.tolist()

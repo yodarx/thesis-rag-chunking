@@ -41,12 +41,19 @@ def test_process_experiment_writes_sorted_cache_and_artifacts(
     config, dataset, out_dir, cache_dir = sorted_config_and_inputs
     exp = config["experiments"][0]
 
-    # Make chunking deterministic and *unsorted* so we can verify sorting persisted.
-    monkeypatch.setattr(
-        build_chunks,
-        "get_chunking_function",
-        lambda name: (lambda text, **kwargs: ["zzzz", "a", "mmmm"]),
-    )
+    # Mock generate_chunks to simply create the sorted file
+    # since build_indicies_SORTED now relies on generate_chunks to create it.
+    def fake_generate_chunks(exp_cfg, ds, v, c_dir):
+        # Emulate build_chunks creating the sorted file
+        chunks = ["zzzz", "a", "mmmm"]
+        exp_dir = Path(c_dir) / exp_cfg["name"]
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        sorted_chunks = sorted(chunks, key=len)
+        (exp_dir / "chunks_SORTED.json").write_text(json.dumps(sorted_chunks))
+        (exp_dir / "chunks.json").write_text(json.dumps(chunks))
+        return chunks
+
+    monkeypatch.setattr(build_indicies_SORTED, "generate_chunks", fake_generate_chunks)
 
     # Avoid progress bar noise and dependency on tqdm internals.
     monkeypatch.setattr(build_indicies_SORTED, "tqdm", lambda x, **kwargs: x)
@@ -92,10 +99,6 @@ def test_process_experiment_writes_sorted_cache_and_artifacts(
     )
 
     # Verify sorted cache file exists and is sorted by length
-    # Old: cache_name = f"{exp['name']}_{exp['name']}_{exp['function']}_chunks.json"
-    # Old: sorted_name = cache_name.replace(".json", "_SORTED.json")
-    # Old: sorted_path = cache_dir / sorted_name
-
     # New: exp['name']/chunks_SORTED.json
     exp_subdir = cache_dir / exp['name']
     sorted_name = str(exp_subdir / "chunks_SORTED.json")
@@ -151,3 +154,4 @@ def test_process_experiment_skips_if_index_exists(sorted_config_and_inputs, monk
         out_dir=str(out_dir),
         cache_dir=str(cache_dir),
     )
+

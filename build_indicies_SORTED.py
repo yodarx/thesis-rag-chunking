@@ -32,11 +32,15 @@ def load_config(config_path: str) -> dict:
         return json.load(f)
 
 
-def calculate_dynamic_batch_size(current_max_char_len: int, model_name: str) -> int:
+def calculate_dynamic_batch_size(current_max_char_len: int, model_name: str, device: str = "cuda") -> int:
     """
     Optimiert für Nvidia L4 (24GB).
     KONSERVATIVE EINSTELLUNG FÜR BGE-LARGE.
+    Falls MPS (Mac), fest auf 32 setzen.
     """
+    if device == "mps" or device == "cpu":
+        return 32
+
     name = model_name.lower()
 
     # Schätzung: 1 Token ~ 3.0 Zeichen
@@ -142,7 +146,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
             )
 
             # Vektorisieren
-            embeddings = vectorizer.embed_documents(batch_text, batch_size=current_bs,convert_to_numpy=True)
+            embeddings = vectorizer.embed_documents(batch_text, batch_size=current_bs, convert_to_numpy=True)
 
             # WICHTIG: Sofort von GPU lösen falls Tensor
             if isinstance(embeddings, torch.Tensor):
@@ -184,24 +188,19 @@ def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
     name = exp["name"]
     model_name = config["embedding_model"]
 
-    # 1. Chunks laden/erstellen
-    chunks = generate_chunks(exp, dataset, vec, cache_dir)
+    generate_chunks(exp, dataset, vec, cache_dir)
 
-    # Cache Name rebuilding for sorting reference
+    # Load sorted chunks directly
     cache_subdir = os.path.join(cache_dir, name)
-    cache_name = os.path.join(cache_subdir, "chunks.json")
-
-    # 2. SORTING
-    print(f"⚡ Sorting {len(chunks)} chunks (Global Sort)...")
-    chunks.sort(key=len)
-
-    if cache_name.endswith("chunks.json"):
-        sorted_name = cache_name.replace("chunks.json", "chunks_SORTED.json")
+    sorted_name = os.path.join(cache_subdir, "chunks_SORTED.json")
 
     if not os.path.exists(sorted_name):
-        print(f"💾 Saving sorted map to {sorted_name}...")
-        with open(sorted_name, "w") as f:
-            json.dump(chunks, f)
+        raise FileNotFoundError(
+            f"Sorted chunks file not found at {sorted_name}, but generate_chunks should have created it.")
+
+    print(f"⚡ Loading sorted chunks from {sorted_name}...")
+    with open(sorted_name) as f:
+        chunks = json.load(f)
 
     # 3. Index bauen
     index_dir = os.path.join(out_dir, create_index_name(name, model_name))
