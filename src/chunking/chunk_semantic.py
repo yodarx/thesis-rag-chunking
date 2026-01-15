@@ -32,7 +32,7 @@ class LangChainAdapter:
         #    We safely use batch_size=512. Since data is sorted, memory usage is efficient.
         embeddings = self.vectorizer.embed_documents(
             sorted_texts,
-            batch_size=512,
+            batch_size=4096,
             convert_to_numpy=True
         )
 
