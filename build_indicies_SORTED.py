@@ -7,6 +7,8 @@ import threading
 import time
 from datetime import datetime
 
+from build_chunks import generate_chunks
+
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
@@ -16,7 +18,6 @@ import torch
 from tqdm import tqdm
 
 # Imports aus deinem Projekt
-from src.chunking.build_chunks import generate_chunks
 from src.experiment.data_loader import load_asqa_dataset
 from src.vectorizer.vectorizer import Vectorizer
 

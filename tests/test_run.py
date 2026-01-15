@@ -70,8 +70,7 @@ def test_run_main_workflow(mock_dependencies, mocker):
     mocker.patch("shutil.copy")
 
     run.main(config_json=config_path)
-
-    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_standard")
+    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_standard_Hard")
 
     mock_dependencies["load_data"].assert_called_once_with(
         config_data["input_file"], config_data.get("limit")
@@ -101,7 +100,7 @@ def test_run_main_silver_suffix(mock_dependencies, mocker):
 
     run.main(config_json=config_path)
 
-    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_test_silver")
+    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_test_silver_Hard")
 
 
 def test_run_main_gold_suffix(mock_dependencies, mocker):
@@ -115,7 +114,7 @@ def test_run_main_gold_suffix(mock_dependencies, mocker):
 
     run.main(config_json=config_path)
 
-    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_test_gold")
+    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_test_gold_Hard")
 
 
 def test_run_main_silver_dataset(mock_dependencies, mocker):
@@ -132,7 +131,7 @@ def test_run_main_silver_dataset(mock_dependencies, mocker):
 
     run.main(config_json=config_path)
 
-    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_test_silver")
+    mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_test_silver_Hard")
     mock_dependencies["load_data"].assert_called_with(
         "data/silver/test_silver.jsonl", config_data.get("limit")
     )

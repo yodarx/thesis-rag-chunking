@@ -5,8 +5,8 @@ from unittest import mock
 
 import pytest
 
+import build_chunks
 import build_indicies_SORTED
-import src.chunking.chunk_loader
 
 
 @pytest.fixture
@@ -43,14 +43,14 @@ def test_process_experiment_writes_sorted_cache_and_artifacts(
 
     # Make chunking deterministic and *unsorted* so we can verify sorting persisted.
     monkeypatch.setattr(
-        src.chunking.chunk_loader,
+        build_chunks,
         "get_chunking_function",
         lambda name: (lambda text, **kwargs: ["zzzz", "a", "mmmm"]),
     )
 
     # Avoid progress bar noise and dependency on tqdm internals.
     monkeypatch.setattr(build_indicies_SORTED, "tqdm", lambda x, **kwargs: x)
-    monkeypatch.setattr(src.chunking.chunk_loader, "tqdm", lambda x, **kwargs: x)
+    monkeypatch.setattr(build_chunks, "tqdm", lambda x, **kwargs: x)
 
     # Avoid heavy FAISS/vectorizer GPU work.
     dummy_index = SimpleNamespace(ntotal=123)
@@ -132,7 +132,7 @@ def test_process_experiment_skips_if_index_exists(sorted_config_and_inputs, monk
 
     # Avoid tqdm
     monkeypatch.setattr(build_indicies_SORTED, "tqdm", lambda x, **kwargs: x)
-    monkeypatch.setattr(src.chunking.build_chunks, "tqdm", lambda x, **kwargs: x)
+    monkeypatch.setattr(build_chunks, "tqdm", lambda x, **kwargs: x)
 
     vec = mock.Mock()
 

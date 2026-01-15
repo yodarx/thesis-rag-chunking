@@ -12,8 +12,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from build_chunks import generate_chunks
 # Deine Imports
-from src.chunking.build_chunks import generate_chunks
 from src.experiment.data_loader import load_asqa_dataset
 from src.vectorizer.vectorizer import Vectorizer
 

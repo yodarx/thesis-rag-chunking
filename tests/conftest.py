@@ -1,19 +1,14 @@
 import pytest
-from tqdm import TMonitor
+import faiss
+from tqdm import tqdm
 
 @pytest.fixture(scope="session", autouse=True)
-def prevent_tqdm_monitor():
+def configure_test_environment():
     """
-    Globally prevent tqdm monitor thread from starting.
-    This fixes segmentation faults when using FAISS + tqdm on macOS.
+    Sets up the test environment to prevent common threading issues.
+    Runs once per test session.
     """
-    # Simply monkey-patch the start method of TMonitor to do nothing
-    original_start = TMonitor.start
-    TMonitor.start = lambda self: None
+    tqdm.monitor_interval = 0
+    faiss.omp_set_num_threads(1)
 
     yield
-
-    # Restore (though usually not needed for session scope fixture)
-    TMonitor.start = original_start
-
-

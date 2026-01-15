@@ -1,12 +1,19 @@
 import json
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import faiss
 import numpy as np
 import pytest
 
 import run
+
+
+@pytest.fixture(autouse=True, scope="module")
+def fix_faiss_threading():
+    """Forces FAISS to single-threaded mode to prevent SegFaults in CI."""
+    faiss.omp_set_num_threads(1)
+    yield
 
 
 @pytest.fixture(autouse=True)
@@ -28,7 +35,7 @@ def mock_tqdm_everywhere():
     mock_obj.__exit__.return_value = None
 
     with patch("src.experiment.runner.tqdm", new=mock_obj), \
-         patch("src.experiment.data_loader.tqdm", new=mock_obj):
+            patch("src.experiment.data_loader.tqdm", new=mock_obj):
         yield mock_obj
 
 
@@ -228,7 +235,6 @@ def test_e2e_run_with_difficulty(e2e_gold_setup):
         os.chdir(tmp_path)
         try:
             run.main(str(config_path))
-
 
             # Verify prefix logic
             # embedding: dummy-model
