@@ -78,29 +78,39 @@ def generate_chunks(
     chunks = []
     start_time = time.time()
 
-    # BATCH CONFIGURATION
-    BATCH_SIZE = 128 if func_name == "chunk_semantic" else 1
+    # Reduced batch size for smoother UI updates (won't hurt speed on L4)
+    BATCH_SIZE = 64 if func_name == "chunk_semantic" else 1
+
     total_docs = len(dataset)
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    # Iterate in batches
-    for i in tqdm(range(0, total_docs, BATCH_SIZE), desc=f"Chunking ({name})"):
-        # Slice batch
-        batch_slice = dataset[i: i + BATCH_SIZE]
-        batch_texts = [d.get("document_text", "") for d in batch_slice]
+    # Create the progress bar with total=total_docs
+    with tqdm(total=total_docs, desc=f"Chunking ({name})", unit="doc") as pbar:
 
-        if not batch_texts:
-            continue
+        # Iterate via index steps
+        for i in range(0, total_docs, BATCH_SIZE):
+            # Slice batch
+            batch_slice = dataset[i: i + BATCH_SIZE]
+            batch_texts = [d.get("document_text", "") for d in batch_slice]
 
-        if func_name == "chunk_semantic":
-            batch_chunks = chunk_func(batch_texts, **call_params)
-            chunks.extend(batch_chunks)
-        else:
-            for text in batch_texts:
-                if text:  # Skip empty strings
-                    chunks.extend(chunk_func(text, **call_params))
+            if not batch_texts:
+                pbar.update(len(batch_slice))
+                continue
+
+            # Process Batch
+            if func_name == "chunk_semantic":
+                # Returns a flat list of chunks for the whole batch
+                batch_chunks = chunk_func(batch_texts, **call_params)
+                chunks.extend(batch_chunks)
+            else:
+                for text in batch_texts:
+                    if text:
+                        chunks.extend(chunk_func(text, **call_params))
+
+            # Update progress bar by the ACTUAL number of docs processed in this batch
+            pbar.update(len(batch_slice))
 
     end_time = time.time()
     duration = end_time - start_time
