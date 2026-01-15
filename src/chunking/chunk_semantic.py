@@ -155,7 +155,7 @@ def chunk_semantic(
         text: str | list[str],
         *,
         chunking_embeddings: EmbeddingVectorizer | str,
-        similarity_threshold: float = 0.8,
+        similarity_threshold: float = 0.8,  # This comes from your config
 ) -> list[str]:
     if not text:
         return []
@@ -170,23 +170,28 @@ def chunk_semantic(
 
     wrapped_embeddings = LangChainEmbeddingWrapper(chunking_embeddings)
 
-    # Convert similarity (0.8) to distance percentile (80th percentile of similarity??)
-    # Actually, if we want to split when similarity is < 0.8:
-    # High similarity = Low distance.
-    # We want to split on High Distance.
-    # LangChain "percentile" splits on the Xth percentile of *distances*.
-    # Just use 90 or 95 as a safe default for "percentile", 
-    # or map your similarity_threshold roughly.
-    # A standard "percentile" value is often 95.
+    # CORRECTION: Restore the logic to map similarity to percentile
+    # If similarity_threshold is 0.8 (high similarity), we want to be strict.
+    # In 'percentile' mode, a high threshold amount (e.g. 95) means "only split on the top 5% most different sentences".
+    # Logic:
+    #   threshold 0.9 (Very strict, many splits) -> Percentile 10 ??
+    #   Actually, standard logic:
+    #   Lower percentile = More splits (lower bar for difference)
+    #   Higher percentile = Fewer splits (only split on massive differences)
 
-    # We use our Optimized Class
+    # Let's stick to the logic from your original file to maintain behavior:
+    # breakpoint_percentile = int((1 - similarity_threshold) * 100)
+    breakpoint_percentile = int((1 - similarity_threshold) * 100)
+
+    # Ensure valid bounds for percentile (must be between 0 and 100)
+    breakpoint_percentile = max(1, min(99, breakpoint_percentile))
+
     text_splitter = BatchSemanticChunker(
         embeddings=wrapped_embeddings,
         breakpoint_threshold_type="percentile",
-        breakpoint_threshold_amount=90,  # Split on the top 10% largest gaps
+        breakpoint_threshold_amount=breakpoint_percentile,
     )
 
-    # This now runs as 1 massive batch
     docs = text_splitter.create_documents(texts)
 
     return [doc.page_content for doc in docs]
