@@ -43,6 +43,7 @@ def test_add_result_record(sample_data_point, sample_metrics):
         data_point=sample_data_point,
         experiment_name="test_exp",
         chunking_time=0.123,
+        retrieval_time=0.045,
         num_chunks=10,
         metrics=sample_metrics,
     )
@@ -52,6 +53,7 @@ def test_add_result_record(sample_data_point, sample_metrics):
     assert result["sample_id"] == "s1"
     assert result["experiment"] == "test_exp"
     assert result["chunking_time_s"] == 0.123
+    assert result["retrieval_time_s"] == 0.045
     assert result["mrr"] == 0.5
 
 
@@ -60,7 +62,7 @@ def test_save_detailed_results(mock_pandas, sample_data_point, sample_metrics, m
     mock_join = mocker.patch("os.path.join", return_value="test_dir/test_ts_detailed.csv")
 
     handler = ResultsHandler("test_dir", "test_ts")
-    handler.add_result_record(sample_data_point, "test_exp", 0.1, 10, sample_metrics)
+    handler.add_result_record(sample_data_point, "test_exp", 0.1, 0.05, 10, sample_metrics)
 
     df = handler.save_detailed_results()
 

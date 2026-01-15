@@ -15,6 +15,7 @@ class ResultsHandler:
         data_point: dict[str, Any],
         experiment_name: str,
         chunking_time: float,
+        retrieval_time: float,
         num_chunks: int,
         metrics: dict[str, float],
     ) -> None:
@@ -23,6 +24,7 @@ class ResultsHandler:
             "question": data_point.get("question", ""),
             "experiment": experiment_name,
             "chunking_time_s": chunking_time,
+            "retrieval_time_s": retrieval_time,
             "num_chunks": num_chunks,
             **metrics,
         }

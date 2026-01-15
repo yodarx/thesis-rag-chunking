@@ -108,11 +108,14 @@ class ExperimentRunner:
                     current_batch_size = len(batch_questions)
 
                     # 2. Batch Retrieval (GPU)
+                    batch_start_time = time.time()
                     try:
                         batch_retrieved_chunks = self.retriever.retrieve_batch(batch_questions, self.top_k)
                     except AttributeError:
                         # Fallback
                         batch_retrieved_chunks = [self.retriever.retrieve(q, self.top_k) for q in batch_questions]
+                    batch_duration = time.time() - batch_start_time
+                    avg_retrieval_time = batch_duration / current_batch_size if current_batch_size > 0 else 0
 
                     # 3. Metriken & Speichern (CPU)
                     for j, data_point in enumerate(batch_data):
@@ -148,6 +151,7 @@ class ExperimentRunner:
                             data_point,
                             exp_name,
                             chunking_time=0,
+                            retrieval_time=avg_retrieval_time,
                             num_chunks=self.retriever.index.ntotal,
                             metrics=metrics,
                         )
@@ -173,3 +177,4 @@ class ExperimentRunner:
         self.results_handler.display_summary(summary_df)
 
         return summary_df
+
