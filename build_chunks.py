@@ -79,7 +79,7 @@ def generate_chunks(
     start_time = time.time()
 
     # BATCH CONFIGURATION
-    BATCH_SIZE = 16 if func_name == "chunk_semantic" else 1
+    BATCH_SIZE = 8 if func_name == "chunk_semantic" else 1
     total_docs = len(dataset)
 
     if torch.cuda.is_available():
