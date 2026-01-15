@@ -94,32 +94,17 @@ def generate_chunks(
         batch_slice = dataset[i: i + BATCH_SIZE]
         batch_texts = [d.get("document_text", "") for d in batch_slice]
 
-        # Skip empty batches
         if not batch_texts:
             continue
 
-        try:
-            if func_name == "chunk_semantic":
-                # FAST PATH: Send whole list to GPU at once
-                # Note: chunk_semantic must accept list[str]
-                batch_chunks = chunk_func(batch_texts, **call_params)
-                chunks.extend(batch_chunks)
-            else:
-                # STANDARD PATH: Iterate manually (fixed/recursive/sentence)
-                for text in batch_texts:
-                    if text:  # Skip empty strings
-                        chunks.extend(chunk_func(text, **call_params))
+        if func_name == "chunk_semantic":
+            batch_chunks = chunk_func(batch_texts, **call_params)
+            chunks.extend(batch_chunks)
+        else:
+            for text in batch_texts:
+                if text:  # Skip empty strings
+                    chunks.extend(chunk_func(text, **call_params))
 
-        except TypeError as e:
-            # Fallback/Debug hint if chunk_semantic wasn't updated
-            if "list" in str(e) and func_name == "chunk_semantic":
-                raise TypeError(
-                    "Error: Your 'chunk_semantic' function does not accept lists yet. "
-                    "Please update src/chunking/chunk_semantic.py to handle List[str]."
-                ) from e
-            raise e
-
-        # Periodic GPU Cleanup
         if torch.cuda.is_available() and i % (BATCH_SIZE * 5) == 0:
             torch.cuda.empty_cache()
 
@@ -161,6 +146,7 @@ def generate_chunks(
         json.dump(sorted_chunks, f)
 
     return chunks
+
 
 def main():
     parser = argparse.ArgumentParser(description="Generate chunks based on experiment config")
