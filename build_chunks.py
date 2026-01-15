@@ -79,7 +79,7 @@ def generate_chunks(
     start_time = time.time()
 
     # Reduced batch size for smoother UI updates (won't hurt speed on L4)
-    BATCH_SIZE = 32 if func_name == "chunk_semantic" else 1
+    BATCH_SIZE = 4 if func_name == "chunk_semantic" else 1
 
     total_docs = len(dataset)
 

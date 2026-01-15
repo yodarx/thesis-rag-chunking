@@ -14,19 +14,39 @@ class EmbeddingVectorizer(Protocol):
     def embed_query(self, text: str) -> list[float]: ...
 
 
+# In src/chunking/chunk_semantic.py
+
 class LangChainAdapter:
-    """Adapts our clean Vectorizer to LangChain's expected interface."""
+    """Adapts our clean Vectorizer to LangChain's expected interface with Smart Batching."""
 
     def __init__(self, vectorizer: EmbeddingVectorizer):
         self.vectorizer = vectorizer
 
-    def embed_documents(self, texts: list[str]) -> np.ndarray:
-        # We enforce NumPy return to avoid slow List[float] serialization
-        return self.vectorizer.embed_documents(texts, batch_size=512, convert_to_numpy=True)
+    def embed_documents(self, texts: List[str]) -> np.ndarray:
+        if not texts: return np.array([])
 
-    def embed_query(self, text: str) -> list[float]:
+        # --- SMART BATCHING OPTIMIZATION ---
+        # 1. Sort texts by length.
+        #    This groups short items with short items, drastically reducing padding.
+        #    Example: [Short, Long, Short] -> [Short, Short, Long]
+        indices = np.argsort([len(t) for t in texts])
+        sorted_texts = [texts[i] for i in indices]
+
+        # 2. Embed the sorted list.
+        #    We use batch_size=512. Since data is sorted, memory usage is efficient.
+        embeddings = self.vectorizer.embed_documents(
+            sorted_texts,
+            batch_size=512,
+            convert_to_numpy=True
+        )
+
+        # 3. Un-sort (Restore original order).
+        #    We need to put embeddings back in the order the chunker expects.
+        inverse_indices = np.argsort(indices)
+        return embeddings[inverse_indices]
+
+    def embed_query(self, text: str) -> List[float]:
         return self.vectorizer.embed_query(text)
-
 
 # --- Core Logic ---
 class BatchSemanticChunker(SemanticChunker):
