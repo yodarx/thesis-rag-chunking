@@ -1,4 +1,4 @@
-from typing import Protocol, Union
+from typing import Protocol
 
 from langchain_experimental.text_splitter import SemanticChunker
 
@@ -16,16 +16,16 @@ class LangChainEmbeddingWrapper:
         self.vectorizer = vectorizer
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        return self.vectorizer.embed_documents(texts, batch_size=64)
+        return self.vectorizer.embed_documents(texts, batch_size=4096)
 
     def embed_query(self, text: str) -> list[float]:
         return self.vectorizer.embed_query(text)
 
 
 def chunk_semantic(
-        text: Union[str, list[str]],
+        text: str | list[str],
         *,
-        chunking_embeddings: Union[EmbeddingVectorizer, str],
+        chunking_embeddings: EmbeddingVectorizer | str,
         similarity_threshold: float = 0.8,
 ) -> list[str]:
     """

@@ -81,7 +81,7 @@ def generate_chunks(
     # BATCH CONFIGURATION
     # 64 is a safe sweet spot for 24GB VRAM.
     # If OOM occurs, lower to 32. If GPU util is low, raise to 128.
-    BATCH_SIZE = 64 if func_name == "chunk_semantic" else 1
+    BATCH_SIZE = 512 if func_name == "chunk_semantic" else 1
 
     total_docs = len(dataset)
 
@@ -128,7 +128,7 @@ def generate_chunks(
         "processing_time_seconds": duration,
         "chunks_per_second": chunks_per_second,
         "timestamp": datetime.now().isoformat(),
-        "device": Vectorizer.get_device() if func_name == "chunk_semantic" else "cpu"
+        "device": Vectorizer.get_device() if func_name == "chunk_semantic" else "cpu",
     }
 
     # Save Standard
