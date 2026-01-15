@@ -22,7 +22,7 @@ class LangChainAdapter:
 
     def embed_documents(self, texts: list[str]) -> np.ndarray:
         # We enforce NumPy return to avoid slow List[float] serialization
-        return self.vectorizer.embed_documents(texts, batch_size=2048, convert_to_numpy=True)
+        return self.vectorizer.embed_documents(texts, batch_size=512, convert_to_numpy=True)
 
     def embed_query(self, text: str) -> list[float]:
         return self.vectorizer.embed_query(text)
