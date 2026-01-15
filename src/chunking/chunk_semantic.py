@@ -1,14 +1,16 @@
 import re
+import time
 import numpy as np
-from typing import List, Protocol, Literal
+from typing import List, Protocol, Literal, Union
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_core.documents import Document
 
 
-# --- Protocols ---
-# We update the protocol to acknowledge the 'batch_size' argument
+# --- Protocol Update: Allow returning np.ndarray directly ---
 class EmbeddingVectorizer(Protocol):
-    def embed_documents(self, texts: list[str], batch_size: int = 512) -> List[List[float]]: ...
+    def embed_documents(
+            self, texts: list[str], batch_size: int = 512, convert_to_numpy: bool = True
+    ) -> Union[List[List[float]], np.ndarray]: ...
 
     def embed_query(self, text: str) -> List[float]: ...
 
@@ -17,24 +19,24 @@ class LangChainEmbeddingWrapper:
     def __init__(self, vectorizer: EmbeddingVectorizer):
         self.vectorizer = vectorizer
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        # --- CRITICAL FIX ---
-        # We explicitly pass batch_size=512 here.
-        # The default (2048) caused the OOM error by trying to allocate 8GB at once.
-        # 512 is the sweet spot for the L4 GPU.
-        return self.vectorizer.embed_documents(texts, batch_size=512)
+    def embed_documents(self, texts: List[str]) -> np.ndarray:
+        # OPTIMIZATION: Request NumPy directly.
+        # This skips the slow "Tensor -> List -> Array" conversion.
+        return self.vectorizer.embed_documents(
+            texts,
+            batch_size=512,  # Safe batch size for L4
+            convert_to_numpy=True
+        )
 
     def embed_query(self, text: str) -> List[float]:
         return self.vectorizer.embed_query(text)
 
 
-# --- Optimized Chunker ---
 class BatchSemanticChunker(SemanticChunker):
     def __init__(
             self,
             embeddings,
-            breakpoint_threshold_type: Literal[
-                "percentile", "standard_deviation", "interquartile", "fixed"] = "percentile",
+            breakpoint_threshold_type: Literal["percentile", "standard_deviation", "interquartile", "fixed"] = "fixed",
             breakpoint_threshold_amount: float = 0.5
     ):
         super().__init__(
@@ -48,15 +50,17 @@ class BatchSemanticChunker(SemanticChunker):
     def create_documents(self, texts: List[str], metadatas: List[dict] = None) -> List[Document]:
         if not texts: return []
 
-        # 1. ROBUST SENTENCE SPLITTING
-        # Look for [.?!], followed by whitespace, followed by a CAPITAL letter.
+        # Performance Timer
+        t0 = time.time()
+
+        # 1. ROBUST SENTENCE SPLITTING (CPU)
+        # Splits on punctuation followed by a Capital letter.
         sentence_splitter = re.compile(r'(?<=[.?!])\s+(?=[A-Z])')
 
         all_sentences = []
         doc_sentence_counts = []
 
         for text in texts:
-            # Clean and split
             sents = [s for s in sentence_splitter.split(text) if s.strip()]
             if not sents:
                 doc_sentence_counts.append(0)
@@ -66,15 +70,25 @@ class BatchSemanticChunker(SemanticChunker):
 
         if not all_sentences: return []
 
-        # 2. BATCH EMBEDDING (Safely Throttled)
-        # The wrapper now handles the batching (512 at a time) internally
-        # preventing the OOM crash.
-        embeddings = self.embeddings.embed_documents(all_sentences)
-        np_embeddings = np.array(embeddings)
+        t1 = time.time()
 
-        # 3. RECONSTRUCTION
+        # 2. BATCH EMBEDDING (GPU)
+        # Direct to NumPy, no list overhead.
+        embeddings = self.embeddings.embed_documents(all_sentences)
+
+        # Ensure it is an array (zero-copy if already array)
+        np_embeddings = np.asarray(embeddings)
+
+        t2 = time.time()
+
+        # 3. RECONSTRUCTION (CPU)
         documents = []
         cursor = 0
+
+        # Pre-calculate common threshold if fixed
+        fixed_threshold = 0.0
+        if self.custom_threshold_type == "fixed":
+            fixed_threshold = 1.0 - self.custom_threshold_amount
 
         for i, count in enumerate(doc_sentence_counts):
             if count == 0: continue
@@ -83,19 +97,16 @@ class BatchSemanticChunker(SemanticChunker):
             doc_embs = np_embeddings[cursor: cursor + count]
             cursor += count
 
-            # Distance Calculation
+            # --- Logic ---
             dists = []
             if len(doc_embs) > 1:
+                # Fast Vectorized Cosine Distance
                 sims = np.sum(doc_embs[:-1] * doc_embs[1:], axis=1)
                 dists = 1.0 - sims
 
-                # 4. THRESHOLD STRATEGY
-            threshold = 0.0
-            if len(dists) > 0:
-                if self.custom_threshold_type == "fixed":
-                    # Fixed Similarity Mode
-                    threshold = 1.0 - self.custom_threshold_amount
-                elif self.breakpoint_threshold_type == "percentile":
+            threshold = fixed_threshold
+            if self.custom_threshold_type != "fixed" and len(dists) > 0:
+                if self.breakpoint_threshold_type == "percentile":
                     threshold = np.percentile(dists, self.breakpoint_threshold_amount)
                 elif self.breakpoint_threshold_type == "standard_deviation":
                     threshold = np.mean(dists) + self.breakpoint_threshold_amount * np.std(dists)
@@ -103,7 +114,6 @@ class BatchSemanticChunker(SemanticChunker):
                     q1, q3 = np.percentile(dists, [25, 75])
                     threshold = q3 + 1.5 * (q3 - q1)
 
-            # 5. CHUNKING LOOP
             current_chunk = [doc_sents[0]]
             for j, distance in enumerate(dists):
                 if distance > threshold:
@@ -117,10 +127,14 @@ class BatchSemanticChunker(SemanticChunker):
                 content = " ".join(current_chunk)
                 documents.append(Document(page_content=content, metadata=metadatas[i] if metadatas else {}))
 
+        t3 = time.time()
+
+        # Debug Print to isolate bottleneck (Uncomment if still slow)
+        print(f"Split: {t1-t0:.3f}s | Embed: {t2-t1:.3f}s | Merge: {t3-t2:.3f}s | Docs: {len(texts)}")
+
         return documents
 
 
-# --- Main Entry Point ---
 def chunk_semantic(
         text: str | list[str],
         *,
