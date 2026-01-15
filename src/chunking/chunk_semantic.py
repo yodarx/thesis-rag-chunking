@@ -1,20 +1,17 @@
 import re
 import time
-from typing import Literal, Protocol
-
 import numpy as np
-from langchain_core.documents import Document
+from typing import List, Protocol, Literal
 from langchain_experimental.text_splitter import SemanticChunker
+from langchain_core.documents import Document
 
 
 # --- Interfaces ---
 class EmbeddingVectorizer(Protocol):
-    def embed_documents(self, texts: list[str], batch_size: int = 256) -> np.ndarray: ...
+    def embed_documents(self, texts: list[str], batch_size: int = 2048) -> np.ndarray: ...
 
-    def embed_query(self, text: str) -> list[float]: ...
+    def embed_query(self, text: str) -> List[float]: ...
 
-
-# In src/chunking/chunk_semantic.py
 
 class LangChainAdapter:
     """Adapts our clean Vectorizer to LangChain's expected interface with Smart Batching."""
@@ -27,13 +24,12 @@ class LangChainAdapter:
 
         # --- SMART BATCHING OPTIMIZATION ---
         # 1. Sort texts by length.
-        #    This groups short items with short items, drastically reducing padding.
-        #    Example: [Short, Long, Short] -> [Short, Short, Long]
+        #    This groups short items with short items, drastically reducing padding overhead.
         indices = np.argsort([len(t) for t in texts])
         sorted_texts = [texts[i] for i in indices]
 
         # 2. Embed the sorted list.
-        #    We use batch_size=512. Since data is sorted, memory usage is efficient.
+        #    We safely use batch_size=512. Since data is sorted, memory usage is efficient.
         embeddings = self.vectorizer.embed_documents(
             sorted_texts,
             batch_size=512,
@@ -47,6 +43,7 @@ class LangChainAdapter:
 
     def embed_query(self, text: str) -> List[float]:
         return self.vectorizer.embed_query(text)
+
 
 # --- Core Logic ---
 class BatchSemanticChunker(SemanticChunker):
@@ -64,7 +61,7 @@ class BatchSemanticChunker(SemanticChunker):
         self.threshold_type = threshold_type
         self.threshold_val = threshold_amount
 
-    def create_documents(self, texts: list[str], metadatas: list[dict] = None) -> list[Document]:
+    def create_documents(self, texts: List[str], metadatas: List[dict] = None) -> List[Document]:
         """
         Main entry point. Flattens docs -> embeds batch -> reconstructs docs.
         """
@@ -99,7 +96,7 @@ class BatchSemanticChunker(SemanticChunker):
 
         return docs
 
-    def _prepare_sentences(self, texts: list[str]) -> tuple[list[str], list[int]]:
+    def _prepare_sentences(self, texts: List[str]) -> tuple[List[str], List[int]]:
         """Splits texts into sentences, safeguarding against massive blobs."""
         all_sentences = []
         doc_lengths = []
@@ -111,7 +108,7 @@ class BatchSemanticChunker(SemanticChunker):
 
         return all_sentences, doc_lengths
 
-    def _split_safe(self, text: str, max_chars: int = 1000) -> list[str]:
+    def _split_safe(self, text: str, max_chars: int = 1000) -> List[str]:
         """Splits on punctuation, but forcibly chops huge segments to protect GPU."""
         # Split on .?! followed by whitespace
         splits = re.split(r'(?<=[.?!])\s+', text)
@@ -131,11 +128,11 @@ class BatchSemanticChunker(SemanticChunker):
 
     def _reconstruct_documents(
             self,
-            sentences: list[str],
+            sentences: List[str],
             embeddings: np.ndarray,
-            counts: list[int],
-            metadatas: list[dict]
-    ) -> list[Document]:
+            counts: List[int],
+            metadatas: List[dict]
+    ) -> List[Document]:
         documents = []
         cursor = 0
 
@@ -175,12 +172,12 @@ class BatchSemanticChunker(SemanticChunker):
 
     def _cluster_sentences(
             self,
-            sentences: list[str],
+            sentences: List[str],
             distances: np.ndarray,
             threshold: float,
-            metadatas: list[dict],
+            metadatas: List[dict],
             meta_idx: int
-    ) -> list[Document]:
+    ) -> List[Document]:
         docs = []
         current_chunk = [sentences[0]]
         metadata = metadatas[meta_idx] if metadatas else {}
