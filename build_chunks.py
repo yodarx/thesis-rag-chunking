@@ -79,9 +79,7 @@ def generate_chunks(
     start_time = time.time()
 
     # BATCH CONFIGURATION
-    # 64 is a safe sweet spot for 24GB VRAM.
-    # If OOM occurs, lower to 32. If GPU util is low, raise to 128.
-    BATCH_SIZE = 1024 if func_name == "chunk_semantic" else 1
+    BATCH_SIZE = 32 if func_name == "chunk_semantic" else 1
     total_docs = len(dataset)
 
     if torch.cuda.is_available():
