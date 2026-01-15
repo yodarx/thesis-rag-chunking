@@ -1,12 +1,35 @@
 import json
 import os
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import faiss
 import numpy as np
 import pytest
 
 import run
+
+
+@pytest.fixture(autouse=True)
+def mock_tqdm_everywhere():
+    """
+    Globally mock tqdm to avoid segmentation faults from monitor threads
+    and to keep test output clean. Handles both iterable wrapping and
+    context manager usage.
+    """
+    mock_obj = MagicMock()
+
+    def side_effect(*args, **kwargs):
+        if args:
+            return args[0]  # Return iterable if passed
+        return mock_obj  # Return mock for context manager logic
+
+    mock_obj.side_effect = side_effect
+    mock_obj.__enter__.return_value = mock_obj
+    mock_obj.__exit__.return_value = None
+
+    with patch("src.experiment.runner.tqdm", new=mock_obj), \
+         patch("src.experiment.data_loader.tqdm", new=mock_obj):
+        yield mock_obj
 
 
 @pytest.fixture
@@ -90,16 +113,22 @@ def test_e2e_gold_pipeline(e2e_gold_setup):
     with open(config_path, "w") as f:
         json.dump(config, f)
 
-    # Mock Vectorizer
+    # Mock Vectorizer and TQDM
     with (
         patch("run.Vectorizer") as mock_vectorizer_run,
         patch("run.create_output_directory") as mock_create_out,
     ):
+
         # Setup Mock Vectorizer
         mock_vectorizer_instance = mock_vectorizer_run.from_model_name.return_value
 
-        def side_effect_embed(docs):
-            return np.random.rand(len(docs), 10).tolist()
+        def side_effect_embed(docs, *args, **kwargs):
+            # Determine if we should return numpy or list
+            convert_to_numpy = kwargs.get("convert_to_numpy", False)
+            embeddings = np.random.rand(len(docs), 10).astype("float32")
+            if convert_to_numpy:
+                return embeddings
+            return embeddings.tolist()
 
         mock_vectorizer_instance.embed_documents.side_effect = side_effect_embed
 

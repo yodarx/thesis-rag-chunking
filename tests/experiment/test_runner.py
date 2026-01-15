@@ -118,6 +118,11 @@ def test_run_all_loop(mock_metrics, mock_deps, sample_experiment, sample_dataset
         embedding_model_name="test-model",
         **mock_deps,
     )
+
+    # Mock retrieve_batch to avoid TypeError: 'Mock' object is not subscriptable
+    mock_retriever = mock_deps["retriever"]
+    mock_retriever.retrieve_batch.return_value = [["chunk1"], ["chunk2"]]
+
     # Execute the main loop method
     summary = runner.run_all()
     # Check that add_result_record was called 4 times (2 data points * 2 experiments)

@@ -42,7 +42,11 @@ def test_embed_documents_calls_model_correctly(mock_sentence_model: SentenceTran
 
     # 1. Überprüfen, ob das Modell korrekt aufgerufen wurde
     mock_sentence_model.encode.assert_called_once_with(
-        documents, show_progress_bar=True, batch_size=batch_size
+        documents,
+        show_progress_bar=False,
+        batch_size=batch_size,
+        convert_to_numpy=True,
+        normalize_embeddings=True,
     )
 
     # 2. Überprüfen, ob das Ergebnis korrekt in eine Liste umgewandelt wurde

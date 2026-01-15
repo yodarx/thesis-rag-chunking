@@ -170,10 +170,6 @@ class ExperimentRunner:
 
         summary_df: pd.DataFrame = self.results_handler.create_and_save_summary(detailed_df)
 
-        print("\n--- Summary Results ---")
-        # Pandas Ausgabe hübscher machen
-        pd.set_option('display.max_columns', None)
-        pd.set_option('display.width', 1000)
-        print(summary_df)
+        self.results_handler.display_summary(summary_df)
 
         return summary_df

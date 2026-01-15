@@ -5,7 +5,6 @@ import os
 import queue
 import threading
 import time
-from collections.abc import Callable
 from datetime import datetime
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -17,25 +16,12 @@ import torch
 from tqdm import tqdm
 
 # Imports aus deinem Projekt
-from src.chunking.chunk_fixed import chunk_fixed_size
-from src.chunking.chunk_recursive import chunk_recursive
-from src.chunking.chunk_semantic import chunk_semantic
-from src.chunking.chunk_sentence import chunk_by_sentence
+from src.chunking.build_chunks import generate_chunks
 from src.experiment.data_loader import load_asqa_dataset
 from src.vectorizer.vectorizer import Vectorizer
 
 
 # --- HELPER FUNCTIONS ---
-def get_chunking_function(name: str) -> Callable[..., list[str]]:
-    chunk_functions = {
-        "chunk_fixed_size": chunk_fixed_size,
-        "chunk_by_sentence": chunk_by_sentence,
-        "chunk_recursive": chunk_recursive,
-        "chunk_semantic": chunk_semantic,
-    }
-    return chunk_functions[name]
-
-
 def create_index_name(exp_name: str, model_name: str) -> str:
     return f"{exp_name}_{model_name.replace('/', '_')}"
 
@@ -155,7 +141,7 @@ def build_index_dynamic(chunks: list[str], vectorizer: Vectorizer, model_name: s
             )
 
             # Vektorisieren
-            embeddings = vectorizer.embed_documents(batch_text, batch_size=current_bs,convert_to_numpy=true)
+            embeddings = vectorizer.embed_documents(batch_text, batch_size=current_bs,convert_to_numpy=True)
 
             # WICHTIG: Sofort von GPU lösen falls Tensor
             if isinstance(embeddings, torch.Tensor):
@@ -198,35 +184,11 @@ def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
     model_name = config["embedding_model"]
 
     # 1. Chunks laden/erstellen
+    chunks = generate_chunks(exp, dataset, vec, cache_dir)
+
+    # Cache Name rebuilding for sorting reference
     id_str = f"{name}_{exp['function']}"
     cache_name = f"{name}_{id_str}_chunks.json"
-    cache_path = os.path.join(cache_dir, cache_name)
-
-    chunks = []
-    if os.path.exists(cache_path):
-        print(f"[{name}] Lade Chunks aus Cache...")
-        with open(cache_path) as f:
-            chunks = json.load(f)
-    else:
-        print(f"[{name}] ⚠️ Cache Miss! Generiere Chunks...")
-        chunk_func = get_chunking_function(exp["function"])
-        params = exp.get("params", {})
-
-        # Params kopieren und ggf. Vectorizer injizieren
-        call_params = params.copy()
-        if exp["function"] == "chunk_semantic":
-            # WICHTIG: Semantic Chunking braucht den Vectorizer als Objekt, nicht String
-            # Wir setzen hier die Batch Size für Semantic Chunking hoch (1024), da effizienter
-            call_params["chunking_embeddings"] = vec
-            if "batch_size" not in call_params:
-                call_params["batch_size"] = 1024
-
-        for d in tqdm(dataset, desc="Chunking"):
-            text = d.get("document_text", "")
-            chunks.extend(chunk_func(text, **call_params))
-
-        with open(cache_path, "w") as f:
-            json.dump(chunks, f)
 
     # 2. SORTING
     print(f"⚡ Sorting {len(chunks)} chunks (Global Sort)...")

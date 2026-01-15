@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-01-13T22:37:13.887262",
+  "duration_seconds": 30.756816,
+  "duration_human": "0:00:30.756816",
+  "dataset_size": 150,
+  "difficulty": null,
+  "config_file": "03_H2_best_retrieval_depth_SILVER.json",
+  "embedding_model": "all-MiniLM-L6-v2",
+  "input_file": "data/preprocessed/silver.jsonl",
+  "retriever_type": "faiss",
+  "top_k": 20,
+  "limit": null,
+  "experiments": [
+    "recursive_512_64",
+    "fixed_512_0",
+    "fixed_512_128",
+    "sentence_s5"
+  ]
+}

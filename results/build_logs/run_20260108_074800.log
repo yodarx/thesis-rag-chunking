@@ -1,0 +1,26 @@
+========================================================
+START RUN: 2026-01-08 07:48:00
+========================================================
+
+========================================================
+[2026-01-08 07:48:00] >>> START BUILD: MINI LM - Parameter Sizing
+--- Execution started at: 2026-01-08 07:48:07.196245 ---
+Selected device for SentenceTransformer: cuda
+Index already exists for recursive_128_16 at data/indices/recursive_128_16_all-MiniLM-L6-v2. Skipping.
+Index already exists for recursive_256_32 at data/indices/recursive_256_32_all-MiniLM-L6-v2. Skipping.
+Index already exists for recursive_512_64 at data/indices/recursive_512_64_all-MiniLM-L6-v2. Skipping.
+Index already exists for recursive_1024_128 at data/indices/recursive_1024_128_all-MiniLM-L6-v2. Skipping.
+Index already exists for fixed_128_0 at data/indices/fixed_128_0_all-MiniLM-L6-v2. Skipping.
+Index already exists for fixed_256_0 at data/indices/fixed_256_0_all-MiniLM-L6-v2. Skipping.
+Index already exists for fixed_512_0 at data/indices/fixed_512_0_all-MiniLM-L6-v2. Skipping.
+Index already exists for fixed_1024_0 at data/indices/fixed_1024_0_all-MiniLM-L6-v2. Skipping.
+Index already exists for fixed_128_16 at data/indices/fixed_128_16_all-MiniLM-L6-v2. Skipping.
+Index already exists for fixed_256_32 at data/indices/fixed_256_32_all-MiniLM-L6-v2. Skipping.
+Index already exists for fixed_512_64 at data/indices/fixed_512_64_all-MiniLM-L6-v2. Skipping.
+Index already exists for fixed_1024_128 at data/indices/fixed_1024_128_all-MiniLM-L6-v2. Skipping.
+Index already exists for sentence_s1 at data/indices/sentence_s1_all-MiniLM-L6-v2. Skipping.
+Index already exists for sentence_s3 at data/indices/sentence_s3_all-MiniLM-L6-v2. Skipping.
+Index already exists for sentence_s5 at data/indices/sentence_s5_all-MiniLM-L6-v2. Skipping.
+Index already exists for sentence_s10 at data/indices/sentence_s10_all-MiniLM-L6-v2. Skipping.
+--- Execution finished at: 2026-01-08 07:48:25.714890 ---
+[2026-01-08 07:48:27] >>> START RUN:  MINI LM - Parameter Sizing

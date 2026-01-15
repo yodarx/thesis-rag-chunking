@@ -4,7 +4,6 @@ import os
 import queue
 import threading
 import time
-from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -14,26 +13,12 @@ import torch
 from tqdm import tqdm
 
 # Deine Imports
-from src.chunking.chunk_fixed import chunk_fixed_size
-from src.chunking.chunk_recursive import chunk_recursive
-from src.chunking.chunk_semantic import chunk_semantic
-from src.chunking.chunk_sentence import chunk_by_sentence
+from src.chunking.build_chunks import generate_chunks
 from src.experiment.data_loader import load_asqa_dataset
 from src.vectorizer.vectorizer import Vectorizer
 
 
 # --- Helper Functions ---
-def get_chunking_function(name: str) -> Callable[..., list[str]]:
-    chunk_functions: dict[str, Callable[..., list[str]]] = {
-        "chunk_fixed_size": chunk_fixed_size,
-        "chunk_by_sentence": chunk_by_sentence,
-        "chunk_recursive": chunk_recursive,
-        "chunk_semantic": chunk_semantic,
-    }
-    if name not in chunk_functions:
-        raise ValueError(f"Unknown chunking function: {name}")
-    return chunk_functions[name]
-
 
 def create_index_name(experiment_name: str, model_name: str) -> str:
     sanitized_model_name: str = model_name.replace("/", "_")
@@ -182,12 +167,6 @@ def process_experiment(
     manual_batch_size: int,  # Kann durch CLI überschrieben werden
 ) -> None:
     experiment_name = experiment["name"]
-    id_string = f"{experiment['name']}_{experiment['function']}"
-
-    cache_filename = f"{experiment_name}_{id_string}_chunks.json"
-    meta_filename = f"{experiment_name}_{id_string}_metadata.json"
-    cache_path = os.path.join(cache_dir, cache_filename)
-    meta_path = os.path.join(cache_dir, meta_filename)
 
     index_dir: str = os.path.join(
         output_dir, create_index_name(experiment_name, config["embedding_model"])
@@ -198,39 +177,14 @@ def process_experiment(
         return
 
     # --- Chunking Part ---
-    chunks: list[str] = []
-    if os.path.exists(cache_path):
-        print(f"Cache hit! Loading chunks from {cache_path}...")
-        with open(cache_path, encoding="utf-8") as f:
-            chunks = json.load(f)
-    else:
-        print(f"Cache miss. Starting chunking for {experiment_name}...")
-        chunk_start_time = time.time()
-        chunk_func = get_chunking_function(experiment["function"])
+    # Use consolidated chunking logic which also handles caching and metadata
+    chunks = generate_chunks(experiment, dataset, vectorizer, cache_dir)
 
-        for data_point in tqdm(dataset, desc="Chunking Docs"):
-            text = data_point.get("document_text", "")
-            params = experiment["params"]
-            if experiment["function"] == "chunk_semantic":
-                params = params.copy()
-                params["chunking_embeddings"] = vectorizer
-            chunks.extend(chunk_func(text, **params))
+    # Reconstruct cache filename for linking (generate_chunks uses this naming convention)
+    id_string = f"{experiment['name']}_{experiment['function']}"
+    cache_filename = f"{experiment_name}_{id_string}_chunks.json"
 
-        os.makedirs(cache_dir, exist_ok=True)
-        with open(cache_path, "w", encoding="utf-8") as f:
-            json.dump(chunks, f)
 
-        # Save Chunk Metadata
-        chunk_metadata = {
-            "experiment_name": experiment_name,
-            "chunking_function": experiment["function"],
-            "parameters": experiment["params"],
-            "num_chunks": len(chunks),
-            "chunking_duration_seconds": time.time() - chunk_start_time,
-            "created_at": datetime.now().isoformat(),
-        }
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(chunk_metadata, f, indent=2)
 
     final_batch_size = manual_batch_size
     if final_batch_size <= 0:

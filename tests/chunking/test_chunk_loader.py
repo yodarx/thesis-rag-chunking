@@ -1,0 +1,88 @@
+import json
+import os
+from unittest.mock import MagicMock, patch
+import pytest
+from src.chunking.chunk_loader import load_chunks
+from src.vectorizer.vectorizer import Vectorizer
+
+@pytest.fixture
+def mock_dataset():
+    return [{"document_text": "doc1"}, {"document_text": "doc2"}]
+
+@pytest.fixture
+def mock_vectorizer():
+    return MagicMock(spec=Vectorizer)
+
+def test_load_chunks_from_cache(tmp_path, mock_dataset, mock_vectorizer):
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+
+    exp_config = {
+        "name": "test_exp",
+        "function": "chunk_fixed_size"
+    }
+
+    # Pre-create cache file
+    cache_name = "test_exp_test_exp_chunk_fixed_size_chunks.json"
+    cache_path = cache_dir / cache_name
+    cached_chunks = ["chunk1", "chunk2"]
+    with open(cache_path, "w") as f:
+        json.dump(cached_chunks, f)
+
+    chunks = load_chunks(exp_config, mock_dataset, mock_vectorizer, str(cache_dir))
+
+    assert chunks == cached_chunks
+
+@patch("src.chunking.chunk_loader.get_chunking_function")
+def test_generate_chunks_and_cache(mock_get_func, tmp_path, mock_dataset, mock_vectorizer):
+    cache_dir = tmp_path / "cache"
+
+    exp_config = {
+        "name": "test_exp",
+        "function": "chunk_fixed_size",
+        "params": {"size": 100}
+    }
+
+    # Mock chunk function behavior
+    mock_chunk_func = MagicMock(return_value=["c1", "c2"])
+    mock_get_func.return_value = mock_chunk_func
+
+    chunks = load_chunks(exp_config, mock_dataset, mock_vectorizer, str(cache_dir))
+
+    assert len(chunks) == 4 # 2 docs * 2 chunks each
+    assert chunks == ["c1", "c2", "c1", "c2"]
+
+    # Check cache file created
+    cache_name = "test_exp_test_exp_chunk_fixed_size_chunks.json"
+    cache_path = cache_dir / cache_name
+    assert cache_path.exists()
+
+    with open(cache_path) as f:
+        data = json.load(f)
+        assert data == chunks
+
+    mock_chunk_func.assert_called_with("doc2", size=100)
+
+@patch("src.chunking.chunk_loader.get_chunking_function")
+def test_semantic_chunking_vectorizer_injection(mock_get_func, tmp_path, mock_dataset, mock_vectorizer):
+    cache_dir = tmp_path / "cache"
+
+    exp_config = {
+        "name": "sem_exp",
+        "function": "chunk_semantic",
+        "params": {"threshold": 0.5}
+    }
+
+    mock_chunk_func = MagicMock(return_value=["sc1"])
+    mock_get_func.return_value = mock_chunk_func
+
+    load_chunks(exp_config, mock_dataset, mock_vectorizer, str(cache_dir))
+
+    # Check if vectorizer was injected into kwargs
+    call_args = mock_chunk_func.call_args
+    assert call_args is not None
+    _, kwargs = call_args
+    assert kwargs["chunking_embeddings"] == mock_vectorizer
+    assert kwargs["threshold"] == 0.5
+    assert kwargs["batch_size"] == 1024 # Default injection
+

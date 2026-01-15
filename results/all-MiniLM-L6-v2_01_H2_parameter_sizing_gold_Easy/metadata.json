@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-01-13T22:04:18.615909",
+  "duration_seconds": 627.270267,
+  "duration_human": "0:10:27.270267",
+  "dataset_size": 3999,
+  "difficulty": "Easy",
+  "config_file": "01_H2_parameter_sizing.json",
+  "embedding_model": "all-MiniLM-L6-v2",
+  "input_file": "data/preprocessed/gold.jsonl",
+  "retriever_type": "faiss",
+  "top_k": 5,
+  "limit": null,
+  "experiments": [
+    "sentence_s1",
+    "sentence_s3",
+    "sentence_s5",
+    "sentence_s10",
+    "recursive_128_16",
+    "recursive_256_32",
+    "recursive_512_64",
+    "recursive_1024_128",
+    "fixed_128_0",
+    "fixed_256_0",
+    "fixed_512_0",
+    "fixed_1024_0",
+    "fixed_128_16",
+    "fixed_256_32",
+    "fixed_512_64",
+    "fixed_1024_128"
+  ]
+}

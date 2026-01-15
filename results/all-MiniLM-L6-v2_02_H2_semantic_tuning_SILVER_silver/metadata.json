@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-01-13T22:29:45.583783",
+  "duration_seconds": 60.605662,
+  "duration_human": "0:01:00.605662",
+  "dataset_size": 150,
+  "difficulty": null,
+  "config_file": "02_H2_semantic_tuning_SILVER.json",
+  "embedding_model": "all-MiniLM-L6-v2",
+  "input_file": "data/preprocessed/silver.jsonl",
+  "retriever_type": "faiss",
+  "top_k": 5,
+  "limit": null,
+  "experiments": [
+    "semantic_t0.5",
+    "semantic_t0.8",
+    "semantic_t0.9",
+    "semantic_t0.95"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-01-13T22:14:55.606683",
+  "duration_seconds": 99.093492,
+  "duration_human": "0:01:39.093492",
+  "dataset_size": 150,
+  "difficulty": null,
+  "config_file": "01_H2_parameter_sizing_SILVER.json",
+  "embedding_model": "all-MiniLM-L6-v2",
+  "input_file": "data/preprocessed/silver.jsonl",
+  "retriever_type": "faiss",
+  "top_k": 5,
+  "limit": null,
+  "experiments": [
+    "sentence_s1",
+    "sentence_s3",
+    "sentence_s5",
+    "sentence_s10",
+    "recursive_128_16",
+    "recursive_256_32",
+    "recursive_512_64",
+    "recursive_1024_128",
+    "fixed_128_0",
+    "fixed_256_0",
+    "fixed_512_0",
+    "fixed_1024_0",
+    "fixed_128_16",
+    "fixed_256_32",
+    "fixed_512_64",
+    "fixed_1024_128"
+  ]
+}

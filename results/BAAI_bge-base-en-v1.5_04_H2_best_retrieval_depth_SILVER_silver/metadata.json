@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-01-13T21:57:51.561328",
+  "duration_seconds": 35.607448,
+  "duration_human": "0:00:35.607448",
+  "dataset_size": 150,
+  "difficulty": null,
+  "config_file": "04_H2_best_retrieval_depth_SILVER.json",
+  "embedding_model": "BAAI/bge-base-en-v1.5",
+  "input_file": "data/preprocessed/silver.jsonl",
+  "retriever_type": "faiss",
+  "top_k": 20,
+  "limit": null,
+  "experiments": [
+    "recursive_512_64",
+    "fixed_512_0",
+    "fixed_512_128",
+    "sentence_s5"
+  ]
+}

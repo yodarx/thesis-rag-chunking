@@ -1,0 +1,79 @@
+========================================================
+START ALL EXPERIMENTS: 2026-01-13 19:31:50
+========================================================
+
+--------------------------------------------------------
+PROCESSING CONFIG: configs/01_model_bge_large/02_H2_parameter_sizing.json
+--------------------------------------------------------
+[2026-01-13 19:31:51] >>> RUNNING: Config=configs/01_model_bge_large/02_H2_parameter_sizing.json | Difficulty=Hard
+--- Analysis started at: 2026-01-13 19:31:57.698318 ---
+Skipping experiment: Results directory 'results/BAAI_bge-large-en-v1.5_02_H2_parameter_sizing_gold_Hard' already exists and contains detailed results.
+--- Analysis finished at: 2026-01-13 19:31:57.788144 ---
+
+[2026-01-13 19:31:59] >>> RUNNING: Config=configs/01_model_bge_large/02_H2_parameter_sizing.json | Difficulty=Moderate
+--- Analysis started at: 2026-01-13 19:32:05.363394 ---
+Skipping experiment: Results directory 'results/BAAI_bge-large-en-v1.5_02_H2_parameter_sizing_gold_Moderate' already exists and contains detailed results.
+--- Analysis finished at: 2026-01-13 19:32:05.414867 ---
+
+[2026-01-13 19:32:06] >>> RUNNING: Config=configs/01_model_bge_large/02_H2_parameter_sizing.json | Difficulty=Easy
+--- Analysis started at: 2026-01-13 19:32:12.980256 ---
+Results for this run will be saved in 'results/BAAI_bge-large-en-v1.5_02_H2_parameter_sizing_gold_Easy'.
+Selected device for SentenceTransformer: cuda
+Filtering dataset for difficulty: Easy
+Filtered dataset size: 3999 (Original: 4345)
+🚀 Starting Benchmark Pipeline
+==================================================
+Total Experiments : 16
+Dataset Size      : 3999 questions
+Batch Size        : 64
+Top-K             : 5
+==================================================
+
+▶ Experiment 1/16: sentence_s1
+   Loading Index...Loading index from data/indices/sentence_s1_BAAI_bge-large-en-v1.5/index.faiss...
+Loading chunks from data/chunks/sentence_s1_sentence_s1_chunk_by_sentence_chunks_SORTED.json...
+Index and chunks loaded.
+   Index Loaded (6178358 documents). Starting Retrieval...
+   Processing:   0%|                                                        | 0/3999 [00:00<?, ?q/s]
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][A
+Batches: 100%|██████████| 1/1 [00:00<00:00,  1.90it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00,  1.90it/s]
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 20.69it/s]
+   Processing:   0%|                                                        | 0/3999 [00:00<?, ?q/s]
+Traceback (most recent call last):
+  File "/home/jeremy/thesis-rag-chunking/src/experiment/runner.py", line 112, in run_all
+    batch_retrieved_chunks = self.retriever.retrieve_batch(batch_questions, self.top_k)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jeremy/thesis-rag-chunking/src/experiment/retriever.py", line 45, in retrieve_batch
+    if query_embeddings.dtype != "float32":
+       ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'list' object has no attribute 'dtype'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/jeremy/thesis-rag-chunking/run.py", line 168, in <module>
+    cli_entry()
+  File "/home/jeremy/thesis-rag-chunking/run.py", line 163, in cli_entry
+    main(args.config_json, difficulty=args.difficulty)
+  File "/home/jeremy/thesis-rag-chunking/run.py", line 124, in main
+    dataset_size = run_experiments(config, output_dir, timestamp_str, difficulty=difficulty)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jeremy/thesis-rag-chunking/run.py", line 88, in run_experiments
+    summary_df = runner.run_all()
+                 ^^^^^^^^^^^^^^^^
+  File "/home/jeremy/thesis-rag-chunking/src/experiment/runner.py", line 115, in run_all
+    batch_retrieved_chunks = [self.retriever.retrieve(q, self.top_k) for q in batch_questions]
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jeremy/thesis-rag-chunking/src/experiment/retriever.py", line 34, in retrieve
+    return self.retrieve_batch([query], top_k)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jeremy/thesis-rag-chunking/src/experiment/retriever.py", line 45, in retrieve_batch
+    if query_embeddings.dtype != "float32":
+       ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'list' object has no attribute 'dtype'
+
+--------------------------------------------------------
+PROCESSING CONFIG: configs/01_model_bge_large/02_H2_parameter_sizing_SILVER.json
+--------------------------------------------------------
+[2026-01-13 19:32:48] >>> RUNNING SILVER: Config=configs/01_model_bge_large/02_H2_parameter_sizing_SILVER.json

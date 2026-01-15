@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-01-13T22:16:43.909001",
+  "duration_seconds": 157.853251,
+  "duration_human": "0:02:37.853251",
+  "dataset_size": 62,
+  "difficulty": "Hard",
+  "config_file": "02_H2_semantic_tuning.json",
+  "embedding_model": "all-MiniLM-L6-v2",
+  "input_file": "data/preprocessed/gold.jsonl",
+  "retriever_type": "faiss",
+  "top_k": 5,
+  "limit": null,
+  "experiments": [
+    "semantic_t0.5",
+    "semantic_t0.8",
+    "semantic_t0.9",
+    "semantic_t0.95"
+  ]
+}
