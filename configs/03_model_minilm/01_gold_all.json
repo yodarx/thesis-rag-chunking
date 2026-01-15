@@ -1,8 +1,7 @@
 {
-  "embedding_model": "BAAI/bge-large-en-v1.5",
+  "embedding_model": "all-MiniLM-L6-v2",
   "retriever_type": "faiss",
-  "top_k": 5,
-  "limit": 40,
+  "top_k": 20,
   "input_file": "data/preprocessed/gold.jsonl",
   "experiments": [
     {
