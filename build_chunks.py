@@ -104,9 +104,6 @@ def generate_chunks(
                 if text:  # Skip empty strings
                     chunks.extend(chunk_func(text, **call_params))
 
-        if torch.cuda.is_available() and i % (BATCH_SIZE * 5) == 0:
-            torch.cuda.empty_cache()
-
     end_time = time.time()
     duration = end_time - start_time
 
