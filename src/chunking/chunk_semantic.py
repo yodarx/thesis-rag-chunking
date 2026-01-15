@@ -6,8 +6,9 @@ from langchain_core.documents import Document
 
 
 # --- Protocols ---
+# We update the protocol to acknowledge the 'batch_size' argument
 class EmbeddingVectorizer(Protocol):
-    def embed_documents(self, texts: list[str]) -> List[List[float]]: ...
+    def embed_documents(self, texts: list[str], batch_size: int = 512) -> List[List[float]]: ...
 
     def embed_query(self, text: str) -> List[float]: ...
 
@@ -17,7 +18,11 @@ class LangChainEmbeddingWrapper:
         self.vectorizer = vectorizer
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return self.vectorizer.embed_documents(texts)
+        # --- CRITICAL FIX ---
+        # We explicitly pass batch_size=512 here.
+        # The default (2048) caused the OOM error by trying to allocate 8GB at once.
+        # 512 is the sweet spot for the L4 GPU.
+        return self.vectorizer.embed_documents(texts, batch_size=512)
 
     def embed_query(self, text: str) -> List[float]:
         return self.vectorizer.embed_query(text)
@@ -32,7 +37,6 @@ class BatchSemanticChunker(SemanticChunker):
                 "percentile", "standard_deviation", "interquartile", "fixed"] = "percentile",
             breakpoint_threshold_amount: float = 0.5
     ):
-        # We initialize with standard defaults, but we will override the logic
         super().__init__(
             embeddings=embeddings,
             breakpoint_threshold_type=breakpoint_threshold_type if breakpoint_threshold_type != "fixed" else "percentile",
@@ -46,7 +50,6 @@ class BatchSemanticChunker(SemanticChunker):
 
         # 1. ROBUST SENTENCE SPLITTING
         # Look for [.?!], followed by whitespace, followed by a CAPITAL letter.
-        # Prevents splitting on "approx. 10" or "Mr. Smith".
         sentence_splitter = re.compile(r'(?<=[.?!])\s+(?=[A-Z])')
 
         all_sentences = []
@@ -63,7 +66,9 @@ class BatchSemanticChunker(SemanticChunker):
 
         if not all_sentences: return []
 
-        # 2. BATCH EMBEDDING (GPU Saturation)
+        # 2. BATCH EMBEDDING (Safely Throttled)
+        # The wrapper now handles the batching (512 at a time) internally
+        # preventing the OOM crash.
         embeddings = self.embeddings.embed_documents(all_sentences)
         np_embeddings = np.array(embeddings)
 
@@ -78,10 +83,9 @@ class BatchSemanticChunker(SemanticChunker):
             doc_embs = np_embeddings[cursor: cursor + count]
             cursor += count
 
-            # Distance Calculation (Cosine Distance = 1 - Cosine Similarity)
+            # Distance Calculation
             dists = []
             if len(doc_embs) > 1:
-                # Normalized Dot Product
                 sims = np.sum(doc_embs[:-1] * doc_embs[1:], axis=1)
                 dists = 1.0 - sims
 
@@ -89,11 +93,8 @@ class BatchSemanticChunker(SemanticChunker):
             threshold = 0.0
             if len(dists) > 0:
                 if self.custom_threshold_type == "fixed":
-                    # Fixed Similarity Mode (Robust for RAG)
-                    # If similarity_threshold is 0.8, we split when similarity < 0.8
-                    # Which means Distance > (1 - 0.8) = 0.2
+                    # Fixed Similarity Mode
                     threshold = 1.0 - self.custom_threshold_amount
-
                 elif self.breakpoint_threshold_type == "percentile":
                     threshold = np.percentile(dists, self.breakpoint_threshold_amount)
                 elif self.breakpoint_threshold_type == "standard_deviation":
@@ -106,12 +107,10 @@ class BatchSemanticChunker(SemanticChunker):
             current_chunk = [doc_sents[0]]
             for j, distance in enumerate(dists):
                 if distance > threshold:
-                    # SPLIT
                     content = " ".join(current_chunk)
                     documents.append(Document(page_content=content, metadata=metadatas[i] if metadatas else {}))
                     current_chunk = [doc_sents[j + 1]]
                 else:
-                    # MERGE
                     current_chunk.append(doc_sents[j + 1])
 
             if current_chunk:
