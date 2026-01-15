@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
+import torch
 from tqdm import tqdm
 
 from src.chunking.chunk_fixed import chunk_fixed_size
@@ -38,7 +39,6 @@ def generate_chunks(
     name = exp_config["name"]
     func_name = exp_config["function"]
 
-    # Consistent with build_indicies_SORTED.py logic
     # Create a directory for the experiment chunks
     exp_dir = os.path.join(cache_dir, name)
     os.makedirs(exp_dir, exist_ok=True)
@@ -53,7 +53,7 @@ def generate_chunks(
         with open(cache_path) as f:
             chunks = json.load(f)
 
-        # Ensure sorted chunks exist (backfill if missing from cache)
+        # Ensure sorted chunks exist
         sorted_cache_path = os.path.join(exp_dir, "chunks_SORTED.json")
         if not os.path.exists(sorted_cache_path):
             print(f"[{name}] Sorted chunks missing. Generating sorted file...")
@@ -71,13 +71,18 @@ def generate_chunks(
     call_params = params.copy()
     if func_name == "chunk_semantic":
         call_params["chunking_embeddings"] = vectorizer
-
     chunks = []
     start_time = time.time()
 
-    for d in tqdm(dataset, desc=f"Chunking ({name})"):
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    for i, d in enumerate(tqdm(dataset, desc=f"Chunking ({name})")):
         text = d.get("document_text", "")
         chunks.extend(chunk_func(text, **call_params))
+
+        if i % 50 == 0 and torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     end_time = time.time()
     duration = end_time - start_time
@@ -122,6 +127,10 @@ def main():
     parser.add_argument("--config", required=True, help="Path to experiment config json")
     parser.add_argument("--cache-dir", default="data/chunks", help="Directory to store generated chunks")
 
+    # Re-added device arg to ensure you can control it if needed
+    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu",
+                        help="Device (cuda, cpu, mps)")
+
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -135,7 +144,9 @@ def main():
 
     if needs_vectorizer or config.get("embedding_model"):
         if config.get("embedding_model"):
-            vec = Vectorizer.from_model_name(config["embedding_model"])
+            print(f"Initializing Vectorizer on device: {args.device}")
+            # Ensure your Vectorizer class accepts device!
+            vec = Vectorizer.from_model_name(config["embedding_model"], device=args.device)
         elif needs_vectorizer:
             raise ValueError("Semantic chunking requires 'embedding_model' in config")
 
