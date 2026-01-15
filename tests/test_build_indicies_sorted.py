@@ -92,9 +92,15 @@ def test_process_experiment_writes_sorted_cache_and_artifacts(
     )
 
     # Verify sorted cache file exists and is sorted by length
-    cache_name = f"{exp['name']}_{exp['name']}_{exp['function']}_chunks.json"
-    sorted_name = cache_name.replace(".json", "_SORTED.json")
-    sorted_path = cache_dir / sorted_name
+    # Old: cache_name = f"{exp['name']}_{exp['name']}_{exp['function']}_chunks.json"
+    # Old: sorted_name = cache_name.replace(".json", "_SORTED.json")
+    # Old: sorted_path = cache_dir / sorted_name
+
+    # New: exp['name']/chunks_SORTED.json
+    exp_subdir = cache_dir / exp['name']
+    sorted_name = str(exp_subdir / "chunks_SORTED.json")
+    sorted_path = Path(sorted_name)
+
     assert sorted_path.exists(), "Expected sorted cache file to be written"
 
     sorted_chunks = json.loads(sorted_path.read_text())

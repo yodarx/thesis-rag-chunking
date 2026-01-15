@@ -14,6 +14,7 @@ def sample_config(tmp_path: Path) -> str:
         "input_file": str(tmp_path / "sample_data.jsonl"),
         "embedding_model": "test-model",
         "output_dir": str(tmp_path / "indices"),
+        "cache_dir": str(tmp_path / "chunks"),  # Setup temp chunks dir
         "experiments": [
             {
                 "name": "fixed",
@@ -52,6 +53,7 @@ def test_build_indices_success(
     tmp_path: Path,
 ) -> None:
     # Force cache miss for chunks.json to ensure we run chunking
+    # Update side_effect to match new path structure: .../chunks.json
     mock_path_exists.side_effect = (
         lambda p: False if str(p).endswith("chunks.json") else Path(p).exists()
     )

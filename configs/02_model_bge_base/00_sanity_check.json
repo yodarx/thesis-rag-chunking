@@ -2,7 +2,7 @@
   "embedding_model": "BAAI/bge-base-en-v1.5",
   "retriever_type": "faiss",
   "top_k": 5,
-  "limit": 40,
+  "limit": 10,
   "input_file": "data/preprocessed/gold.jsonl",
   "experiments": [
     {

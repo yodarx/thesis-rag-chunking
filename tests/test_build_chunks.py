@@ -27,8 +27,12 @@ def test_generate_chunks_from_cache(tmp_path, mock_dataset, mock_vectorizer):
     }
 
     # Pre-create cache file
-    cache_name = "test_exp_test_exp_chunk_fixed_size_chunks.json"
-    cache_path = cache_dir / cache_name
+    # Old: cache_name = "test_exp_test_exp_chunk_fixed_size_chunks.json"
+    # New: test_exp/chunks.json
+    exp_dir = cache_dir / "test_exp"
+    exp_dir.mkdir()
+    cache_path = exp_dir / "chunks.json"
+
     cached_chunks = ["chunk1", "chunk2"]
     with open(cache_path, "w") as f:
         json.dump(cached_chunks, f)
@@ -58,8 +62,9 @@ def test_generate_chunks_and_cache(mock_get_func, tmp_path, mock_dataset, mock_v
     assert chunks == ["c1", "c2", "c1", "c2"]
 
     # Check cache file created
-    cache_name = "test_exp_test_exp_chunk_fixed_size_chunks.json"
-    cache_path = cache_dir / cache_name
+    exp_dir = cache_dir / "test_exp"
+    assert exp_dir.exists()
+    cache_path = exp_dir / "chunks.json"
     assert cache_path.exists()
 
     with open(cache_path) as f:
@@ -69,8 +74,7 @@ def test_generate_chunks_and_cache(mock_get_func, tmp_path, mock_dataset, mock_v
     mock_chunk_func.assert_called_with("doc2", size=100)
 
     # Check metadata file
-    metadata_name = "test_exp_test_exp_chunk_fixed_size_metadata.json"
-    metadata_path = cache_dir / metadata_name
+    metadata_path = exp_dir / "metadata.json"
     assert metadata_path.exists()
 
     with open(metadata_path) as f:
@@ -106,4 +110,3 @@ def test_semantic_chunking_vectorizer_injection(mock_get_func, tmp_path, mock_da
     _, kwargs = call_args
     assert kwargs["chunking_embeddings"] == mock_vectorizer
     assert kwargs["threshold"] == 0.5
-    assert kwargs["batch_size"] == 1024  # Default injection

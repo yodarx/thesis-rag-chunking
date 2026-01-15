@@ -181,9 +181,12 @@ def process_experiment(
     chunks = generate_chunks(experiment, dataset, vectorizer, cache_dir)
 
     # Reconstruct cache filename for linking (generate_chunks uses this naming convention)
-    id_string = f"{experiment['name']}_{experiment['function']}"
-    cache_filename = f"{experiment_name}_{id_string}_chunks.json"
+    # id_string = f"{experiment['name']}_{experiment['function']}"
+    # cache_filename = f"{experiment_name}_{id_string}_chunks.json"
 
+    # New convention: {experiment_name}/chunks.json
+    cache_subdir = os.path.join(cache_dir, experiment_name)
+    cache_filename = os.path.join(cache_subdir, "chunks.json")
 
 
     final_batch_size = manual_batch_size

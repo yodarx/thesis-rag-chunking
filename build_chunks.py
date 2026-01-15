@@ -27,10 +27,10 @@ def get_chunking_function(name: str) -> Callable[..., list[str]]:
 
 
 def generate_chunks(
-    exp_config: dict[str, Any],
-    dataset: list[dict[str, Any]],
-    vectorizer: Vectorizer,
-    cache_dir: str
+        exp_config: dict[str, Any],
+        dataset: list[dict[str, Any]],
+        vectorizer: Vectorizer,
+        cache_dir: str
 ) -> list[str]:
     """
     Loads chunks from cache or generates them if not present.
@@ -39,11 +39,14 @@ def generate_chunks(
     func_name = exp_config["function"]
 
     # Consistent with build_indicies_SORTED.py logic
-    id_str = f"{name}_{func_name}"
-    cache_name = f"{name}_{id_str}_chunks.json"
-    metadata_name = f"{name}_{id_str}_metadata.json"
-    cache_path = os.path.join(cache_dir, cache_name)
-    metadata_path = os.path.join(cache_dir, metadata_name)
+    # Create a directory for the experiment chunks
+    exp_dir = os.path.join(cache_dir, name)
+    os.makedirs(exp_dir, exist_ok=True)
+
+    cache_name = "chunks.json"
+    metadata_name = "metadata.json"
+    cache_path = os.path.join(exp_dir, cache_name)
+    metadata_path = os.path.join(exp_dir, metadata_name)
 
     if os.path.exists(cache_path):
         print(f"[{name}] Lade Chunks aus Cache...")
@@ -58,8 +61,6 @@ def generate_chunks(
     call_params = params.copy()
     if func_name == "chunk_semantic":
         call_params["chunking_embeddings"] = vectorizer
-        if "batch_size" not in call_params:
-            call_params["batch_size"] = 1024
 
     chunks = []
     start_time = time.time()
@@ -90,8 +91,6 @@ def generate_chunks(
         "timestamp": datetime.now().isoformat(),
     }
 
-    # Ensure cache dir exists
-    os.makedirs(cache_dir, exist_ok=True)
     with open(cache_path, "w") as f:
         json.dump(chunks, f)
 
@@ -118,12 +117,10 @@ def main():
     needs_vectorizer = any(exp["function"] == "chunk_semantic" for exp in config["experiments"])
 
     if needs_vectorizer or config.get("embedding_model"):
-        # Even if not semantic chunking, we might want to standardize on loading it if available?
-        # But semantic chunking SPECIFICALLY needs it.
         if config.get("embedding_model"):
-             vec = Vectorizer.from_model_name(config["embedding_model"])
+            vec = Vectorizer.from_model_name(config["embedding_model"])
         elif needs_vectorizer:
-             raise ValueError("Semantic chunking requires 'embedding_model' in config")
+            raise ValueError("Semantic chunking requires 'embedding_model' in config")
 
     for exp in config["experiments"]:
         generate_chunks(exp, dataset, vec, args.cache_dir)
@@ -131,4 +128,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

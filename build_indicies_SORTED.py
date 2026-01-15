@@ -188,17 +188,19 @@ def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
     chunks = generate_chunks(exp, dataset, vec, cache_dir)
 
     # Cache Name rebuilding for sorting reference
-    id_str = f"{name}_{exp['function']}"
-    cache_name = f"{name}_{id_str}_chunks.json"
+    cache_subdir = os.path.join(cache_dir, name)
+    cache_name = os.path.join(cache_subdir, "chunks.json")
 
     # 2. SORTING
     print(f"⚡ Sorting {len(chunks)} chunks (Global Sort)...")
     chunks.sort(key=len)
 
-    sorted_name = cache_name.replace(".json", "_SORTED.json")
-    if not os.path.exists(os.path.join(cache_dir, sorted_name)):
+    if cache_name.endswith("chunks.json"):
+        sorted_name = cache_name.replace("chunks.json", "chunks_SORTED.json")
+
+    if not os.path.exists(sorted_name):
         print(f"💾 Saving sorted map to {sorted_name}...")
-        with open(os.path.join(cache_dir, sorted_name), "w") as f:
+        with open(sorted_name, "w") as f:
             json.dump(chunks, f)
 
     # 3. Index bauen
