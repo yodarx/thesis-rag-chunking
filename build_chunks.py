@@ -145,8 +145,7 @@ def main():
     if needs_vectorizer or config.get("embedding_model"):
         if config.get("embedding_model"):
             print(f"Initializing Vectorizer on device: {args.device}")
-            # Ensure your Vectorizer class accepts device!
-            vec = Vectorizer.from_model_name(config["embedding_model"], device=args.device)
+            vec = Vectorizer.from_model_name(config["embedding_model"])
         elif needs_vectorizer:
             raise ValueError("Semantic chunking requires 'embedding_model' in config")
 
