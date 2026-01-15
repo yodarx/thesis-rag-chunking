@@ -20,11 +20,9 @@ class LangChainEmbeddingWrapper:
         self.vectorizer = vectorizer
 
     def embed_documents(self, texts: List[str]) -> np.ndarray:
-        # OPTIMIZATION: Request NumPy directly.
-        # This skips the slow "Tensor -> List -> Array" conversion.
         return self.vectorizer.embed_documents(
             texts,
-            batch_size=512,  # Safe batch size for L4
+            batch_size=1024,  # Safe batch size for L4
             convert_to_numpy=True
         )
 
