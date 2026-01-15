@@ -1,32 +1,25 @@
 import re
-import time
+from typing import Literal, Protocol
+
 import numpy as np
-from typing import List, Protocol, Literal, Union
-from langchain_experimental.text_splitter import SemanticChunker
 from langchain_core.documents import Document
+from langchain_experimental.text_splitter import SemanticChunker
 
 
-# --- Protocol Update: Allow returning np.ndarray directly ---
 class EmbeddingVectorizer(Protocol):
-    def embed_documents(
-            self, texts: list[str], batch_size: int = 512, convert_to_numpy: bool = True
-    ) -> Union[List[List[float]], np.ndarray]: ...
+    def embed_documents(self, texts: list[str], batch_size: int = 2048) -> np.ndarray: ...
 
-    def embed_query(self, text: str) -> List[float]: ...
+    def embed_query(self, text: str) -> list[float]: ...
 
 
-class LangChainEmbeddingWrapper:
+class LangChainAdapter:
     def __init__(self, vectorizer: EmbeddingVectorizer):
         self.vectorizer = vectorizer
 
-    def embed_documents(self, texts: List[str]) -> np.ndarray:
-        return self.vectorizer.embed_documents(
-            texts,
-            batch_size=1024,  # Safe batch size for L4
-            convert_to_numpy=True
-        )
+    def embed_documents(self, texts: list[str]) -> np.ndarray:
+        return self.vectorizer.embed_documents(texts, batch_size=2048, convert_to_numpy=True)
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         return self.vectorizer.embed_query(text)
 
 
@@ -34,126 +27,134 @@ class BatchSemanticChunker(SemanticChunker):
     def __init__(
             self,
             embeddings,
-            breakpoint_threshold_type: Literal["percentile", "standard_deviation", "interquartile", "fixed"] = "fixed",
-            breakpoint_threshold_amount: float = 0.5
+            threshold_type: Literal["percentile", "fixed"] = "fixed",
+            threshold_amount: float = 0.5
     ):
         super().__init__(
             embeddings=embeddings,
-            breakpoint_threshold_type=breakpoint_threshold_type if breakpoint_threshold_type != "fixed" else "percentile",
-            breakpoint_threshold_amount=breakpoint_threshold_amount
+            breakpoint_threshold_type="percentile",  # Parent expects valid enum
+            breakpoint_threshold_amount=threshold_amount
         )
-        self.custom_threshold_type = breakpoint_threshold_type
-        self.custom_threshold_amount = breakpoint_threshold_amount
+        self.threshold_type = threshold_type
+        self.threshold_val = threshold_amount
 
-    def create_documents(self, texts: List[str], metadatas: List[dict] = None) -> List[Document]:
+    def create_documents(self, texts: list[str], metadatas: list[dict] = None) -> list[Document]:
         if not texts: return []
 
-        # Performance Timer
-        t0 = time.time()
+        sentences, doc_lengths = self._prepare_sentences(texts)
+        if not sentences: return []
 
-        # 1. ROBUST SENTENCE SPLITTING (CPU)
-        # Splits on punctuation followed by a Capital letter.
-        sentence_splitter = re.compile(r'(?<=[.?!])\s+(?=[A-Z])')
+        embeddings = self.embeddings.embed_documents(sentences)
+        return self._reconstruct_documents(sentences, embeddings, doc_lengths, metadatas)
 
+    def _prepare_sentences(self, texts: list[str]) -> tuple[list[str], list[int]]:
         all_sentences = []
-        doc_sentence_counts = []
+        doc_lengths = []
 
         for text in texts:
-            sents = [s for s in sentence_splitter.split(text) if s.strip()]
-            if not sents:
-                doc_sentence_counts.append(0)
-                continue
+            # Split by punctuation but enforce max length to prevent GPU stalls
+            sents = self._split_safe(text)
             all_sentences.extend(sents)
-            doc_sentence_counts.append(len(sents))
+            doc_lengths.append(len(sents))
 
-        if not all_sentences: return []
+        return all_sentences, doc_lengths
 
-        t1 = time.time()
+    def _split_safe(self, text: str, max_chars: int = 1000) -> list[str]:
+        # Split on punctuation (.?!) followed by whitespace
+        splits = re.split(r'(?<=[.?!])\s+', text)
+        clean_splits = []
 
-        # 2. BATCH EMBEDDING (GPU)
-        # Direct to NumPy, no list overhead.
-        embeddings = self.embeddings.embed_documents(all_sentences)
+        for s in splits:
+            s = s.strip()
+            if not s: continue
 
-        # Ensure it is an array (zero-copy if already array)
-        np_embeddings = np.asarray(embeddings)
+            if len(s) > max_chars:
+                # Hard chop massive strings to protect O(N^2) attention layers
+                clean_splits.extend([s[i:i + max_chars] for i in range(0, len(s), max_chars)])
+            else:
+                clean_splits.append(s)
 
-        t2 = time.time()
+        return clean_splits
 
-        # 3. RECONSTRUCTION (CPU)
+    def _reconstruct_documents(
+            self,
+            sentences: list[str],
+            embeddings: np.ndarray,
+            counts: list[int],
+            metadatas: list[dict]
+    ) -> list[Document]:
         documents = []
         cursor = 0
 
-        # Pre-calculate common threshold if fixed
-        fixed_threshold = 0.0
-        if self.custom_threshold_type == "fixed":
-            fixed_threshold = 1.0 - self.custom_threshold_amount
+        fixed_threshold = 1.0 - self.threshold_val
 
-        for i, count in enumerate(doc_sentence_counts):
+        for i, count in enumerate(counts):
             if count == 0: continue
 
-            doc_sents = all_sentences[cursor: cursor + count]
-            doc_embs = np_embeddings[cursor: cursor + count]
+            doc_sents = sentences[cursor: cursor + count]
+            doc_embs = embeddings[cursor: cursor + count]
             cursor += count
 
-            # --- Logic ---
-            dists = []
-            if len(doc_embs) > 1:
-                # Fast Vectorized Cosine Distance
-                sims = np.sum(doc_embs[:-1] * doc_embs[1:], axis=1)
-                dists = 1.0 - sims
+            threshold = self._calculate_threshold(doc_embs, fixed_threshold)
+            distances = self._calculate_distances(doc_embs)
 
-            threshold = fixed_threshold
-            if self.custom_threshold_type != "fixed" and len(dists) > 0:
-                if self.breakpoint_threshold_type == "percentile":
-                    threshold = np.percentile(dists, self.breakpoint_threshold_amount)
-                elif self.breakpoint_threshold_type == "standard_deviation":
-                    threshold = np.mean(dists) + self.breakpoint_threshold_amount * np.std(dists)
-                elif self.breakpoint_threshold_type == "interquartile":
-                    q1, q3 = np.percentile(dists, [25, 75])
-                    threshold = q3 + 1.5 * (q3 - q1)
-
-            current_chunk = [doc_sents[0]]
-            for j, distance in enumerate(dists):
-                if distance > threshold:
-                    content = " ".join(current_chunk)
-                    documents.append(Document(page_content=content, metadata=metadatas[i] if metadatas else {}))
-                    current_chunk = [doc_sents[j + 1]]
-                else:
-                    current_chunk.append(doc_sents[j + 1])
-
-            if current_chunk:
-                content = " ".join(current_chunk)
-                documents.append(Document(page_content=content, metadata=metadatas[i] if metadatas else {}))
-
-        t3 = time.time()
-
-        # Debug Print to isolate bottleneck (Uncomment if still slow)
-        print(f"Split: {t1-t0:.3f}s | Embed: {t2-t1:.3f}s | Merge: {t3-t2:.3f}s | Docs: {len(texts)}")
+            documents.extend(self._cluster_sentences(doc_sents, distances, threshold, metadatas, i))
 
         return documents
+
+    def _calculate_distances(self, embeddings: np.ndarray) -> np.ndarray:
+        if len(embeddings) < 2: return np.array([])
+        # Cosine Distance = 1 - Dot Product (of normalized vectors)
+        sims = np.sum(embeddings[:-1] * embeddings[1:], axis=1)
+        return 1.0 - sims
+
+    def _calculate_threshold(self, embeddings: np.ndarray, fixed_val: float) -> float:
+        if self.threshold_type == "fixed":
+            return fixed_val
+
+        distances = self._calculate_distances(embeddings)
+        if len(distances) == 0: return 0.0
+
+        return np.percentile(distances, self.threshold_val)
+
+    def _cluster_sentences(
+            self,
+            sentences: list[str],
+            distances: np.ndarray,
+            threshold: float,
+            metadatas: list[dict],
+            meta_idx: int
+    ) -> list[Document]:
+        docs = []
+        current_chunk = [sentences[0]]
+        metadata = metadatas[meta_idx] if metadatas else {}
+
+        for j, dist in enumerate(distances):
+            if dist > threshold:
+                docs.append(Document(page_content=" ".join(current_chunk), metadata=metadata))
+                current_chunk = [sentences[j + 1]]
+            else:
+                current_chunk.append(sentences[j + 1])
+
+        if current_chunk:
+            docs.append(Document(page_content=" ".join(current_chunk), metadata=metadata))
+
+        return docs
 
 
 def chunk_semantic(
         text: str | list[str],
         *,
-        chunking_embeddings: EmbeddingVectorizer | str,
+        chunking_embeddings: EmbeddingVectorizer,
         similarity_threshold: float = 0.8,
 ) -> list[str]:
     if not text: return []
+
     texts = [text] if isinstance(text, str) else text
     texts = [t for t in texts if t and t.strip()]
-    if not texts: return []
 
-    if isinstance(chunking_embeddings, str):
-        raise ValueError("chunking_embeddings must be a Vectorizer instance.")
+    adapter = LangChainAdapter(chunking_embeddings)
+    splitter = BatchSemanticChunker(adapter, threshold_type="fixed", threshold_amount=similarity_threshold)
 
-    wrapped_embeddings = LangChainEmbeddingWrapper(chunking_embeddings)
-
-    text_splitter = BatchSemanticChunker(
-        embeddings=wrapped_embeddings,
-        breakpoint_threshold_type="fixed",
-        breakpoint_threshold_amount=similarity_threshold,
-    )
-
-    docs = text_splitter.create_documents(texts)
-    return [doc.page_content for doc in docs]
+    docs = splitter.create_documents(texts)
+    return [d.page_content for d in docs]

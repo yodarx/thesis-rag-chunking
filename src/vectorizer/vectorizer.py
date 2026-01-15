@@ -9,55 +9,33 @@ class Vectorizer:
 
     @classmethod
     def from_model_name(cls, model_name: str = "all-MiniLM-L6-v2") -> "Vectorizer":
-        # 1. Force Device Check
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"[{cls.__name__}] Initializing SentenceTransformer on: {device.upper()}")
+        print(f"Initializing {model_name} on {device.upper()}")
 
-        loaded_model = SentenceTransformer(model_name, device=device)
+        model = SentenceTransformer(model_name, device=device)
 
-        # 2. FP16 Optimization (Safe)
         if device == "cuda":
-            print(f"[{cls.__name__}] Enabling FP16 (Half Precision)...")
-            loaded_model.half()
+            model.half()
 
-        # 3. COMPILATION IS REMOVED COMPLETELY
-        # No 'torch.compile' calls here at all.
-        # This guarantees standard eager execution (Instant start, consistent speed).
-
-        return cls(loaded_model)
-
-    @staticmethod
-    def get_device() -> str | None:
-        if torch.cuda.is_available():
-            return "cuda"
-        if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
-            return "mps"
-        return None
+        return cls(model)
 
     def embed_documents(
             self,
-            documents: list[str],
+            texts: list[str],
             batch_size: int = 2048,
-            convert_to_numpy: bool = False
-    ) -> list[list[float]] | np.ndarray:
-
-        # --- DEBUG LOGGING (Remove later) ---
-        # This proves if the GPU is actually receiving work
-        # print(f"  -> Vectorizer: Encoding {len(documents)} sentences (Batch size: {batch_size})...")
-
-        if not documents:
+            convert_to_numpy: bool = True
+    ) -> np.ndarray | list[list[float]]:
+        if not texts:
             return np.empty((0, 0), dtype=np.float32) if convert_to_numpy else []
 
-        # 4. Critical: Ensure we don't accidentally re-compile or use CPU
         embeddings = self.model.encode(
-            documents,
-            show_progress_bar=False,
+            texts,
             batch_size=batch_size,
+            show_progress_bar=False,
             convert_to_numpy=True,
             normalize_embeddings=True
         )
 
-        # 5. Fast Return
         if convert_to_numpy:
             return embeddings.astype("float32")
 
