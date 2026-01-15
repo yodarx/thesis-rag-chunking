@@ -1,4 +1,5 @@
 import re
+import time
 from typing import Literal, Protocol
 
 import numpy as np
@@ -6,6 +7,7 @@ from langchain_core.documents import Document
 from langchain_experimental.text_splitter import SemanticChunker
 
 
+# --- Interfaces ---
 class EmbeddingVectorizer(Protocol):
     def embed_documents(self, texts: list[str], batch_size: int = 2048) -> np.ndarray: ...
 
@@ -13,16 +15,20 @@ class EmbeddingVectorizer(Protocol):
 
 
 class LangChainAdapter:
+    """Adapts our clean Vectorizer to LangChain's expected interface."""
+
     def __init__(self, vectorizer: EmbeddingVectorizer):
         self.vectorizer = vectorizer
 
     def embed_documents(self, texts: list[str]) -> np.ndarray:
+        # We enforce NumPy return to avoid slow List[float] serialization
         return self.vectorizer.embed_documents(texts, batch_size=2048, convert_to_numpy=True)
 
     def embed_query(self, text: str) -> list[float]:
         return self.vectorizer.embed_query(text)
 
 
+# --- Core Logic ---
 class BatchSemanticChunker(SemanticChunker):
     def __init__(
             self,
@@ -32,27 +38,53 @@ class BatchSemanticChunker(SemanticChunker):
     ):
         super().__init__(
             embeddings=embeddings,
-            breakpoint_threshold_type="percentile",  # Parent expects valid enum
+            breakpoint_threshold_type="percentile",  # Parent requires valid enum
             breakpoint_threshold_amount=threshold_amount
         )
         self.threshold_type = threshold_type
         self.threshold_val = threshold_amount
 
     def create_documents(self, texts: list[str], metadatas: list[dict] = None) -> list[Document]:
+        """
+        Main entry point. Flattens docs -> embeds batch -> reconstructs docs.
+        """
         if not texts: return []
+
+        # [DEBUG] Start Timer
+        t0 = time.time()
 
         sentences, doc_lengths = self._prepare_sentences(texts)
         if not sentences: return []
 
+        # [DEBUG] Data Health Check
+        # If 'Max Len' is huge (>5000), your regex is failing and GPU will choke.
+        t1 = time.time()
+        avg_len = sum(len(s) for s in sentences) / len(sentences)
+        max_len = max(len(s) for s in sentences)
+        print(
+            f"[DEBUG] Batch: {len(texts)} Docs -> {len(sentences)} Sents | Avg Char: {avg_len:.0f} | Max Char: {max_len}")
+
+        # GPU Operation
         embeddings = self.embeddings.embed_documents(sentences)
-        return self._reconstruct_documents(sentences, embeddings, doc_lengths, metadatas)
+
+        # [DEBUG] GPU Timer
+        t2 = time.time()
+
+        # Clustering Logic
+        docs = self._reconstruct_documents(sentences, embeddings, doc_lengths, metadatas)
+
+        # [DEBUG] Phase Timing
+        t3 = time.time()
+        print(f"[PROFILE] Prep (CPU): {t1 - t0:.3f}s | Embed (GPU): {t2 - t1:.3f}s | Merge (CPU): {t3 - t2:.3f}s")
+
+        return docs
 
     def _prepare_sentences(self, texts: list[str]) -> tuple[list[str], list[int]]:
+        """Splits texts into sentences, safeguarding against massive blobs."""
         all_sentences = []
         doc_lengths = []
 
         for text in texts:
-            # Split by punctuation but enforce max length to prevent GPU stalls
             sents = self._split_safe(text)
             all_sentences.extend(sents)
             doc_lengths.append(len(sents))
@@ -60,7 +92,8 @@ class BatchSemanticChunker(SemanticChunker):
         return all_sentences, doc_lengths
 
     def _split_safe(self, text: str, max_chars: int = 1000) -> list[str]:
-        # Split on punctuation (.?!) followed by whitespace
+        """Splits on punctuation, but forcibly chops huge segments to protect GPU."""
+        # Split on .?! followed by whitespace
         splits = re.split(r'(?<=[.?!])\s+', text)
         clean_splits = []
 
@@ -69,7 +102,7 @@ class BatchSemanticChunker(SemanticChunker):
             if not s: continue
 
             if len(s) > max_chars:
-                # Hard chop massive strings to protect O(N^2) attention layers
+                # Hard chop O(N^2) killers
                 clean_splits.extend([s[i:i + max_chars] for i in range(0, len(s), max_chars)])
             else:
                 clean_splits.append(s)
@@ -91,20 +124,23 @@ class BatchSemanticChunker(SemanticChunker):
         for i, count in enumerate(counts):
             if count == 0: continue
 
+            # Slice batch data for this document
             doc_sents = sentences[cursor: cursor + count]
             doc_embs = embeddings[cursor: cursor + count]
             cursor += count
 
+            # Math
             threshold = self._calculate_threshold(doc_embs, fixed_threshold)
             distances = self._calculate_distances(doc_embs)
 
+            # Build
             documents.extend(self._cluster_sentences(doc_sents, distances, threshold, metadatas, i))
 
         return documents
 
     def _calculate_distances(self, embeddings: np.ndarray) -> np.ndarray:
         if len(embeddings) < 2: return np.array([])
-        # Cosine Distance = 1 - Dot Product (of normalized vectors)
+        # Cosine Dist = 1 - Dot(NormA, NormB)
         sims = np.sum(embeddings[:-1] * embeddings[1:], axis=1)
         return 1.0 - sims
 
@@ -131,9 +167,11 @@ class BatchSemanticChunker(SemanticChunker):
 
         for j, dist in enumerate(distances):
             if dist > threshold:
+                # Split
                 docs.append(Document(page_content=" ".join(current_chunk), metadata=metadata))
                 current_chunk = [sentences[j + 1]]
             else:
+                # Merge
                 current_chunk.append(sentences[j + 1])
 
         if current_chunk:
@@ -142,6 +180,7 @@ class BatchSemanticChunker(SemanticChunker):
         return docs
 
 
+# --- Main Entry Point ---
 def chunk_semantic(
         text: str | list[str],
         *,
@@ -149,7 +188,6 @@ def chunk_semantic(
         similarity_threshold: float = 0.8,
 ) -> list[str]:
     if not text: return []
-
     texts = [text] if isinstance(text, str) else text
     texts = [t for t in texts if t and t.strip()]
 
