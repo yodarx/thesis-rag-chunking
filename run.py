@@ -94,11 +94,12 @@ def run_experiments(
     return len(runner.dataset)
 
 
-def main(config_json: str = None, difficulty: str | None = None) -> None:
+def main(config_json: str = None) -> None:
     start_time = datetime.now()
     timestamp_str = start_time.strftime("%Y-%m-%d_%H-%M-%S")
 
     config = load_config(config_json)
+    difficulty = config.get("difficulty")
 
     prefix = generate_experiment_prefix(config, config_json, difficulty)
 
@@ -154,13 +155,8 @@ def cli_entry() -> None:
         required=True,
         help="Path to the experiment config JSON file (e.g., configs/base_experiment.json)",
     )
-    parser.add_argument(
-        "--difficulty",
-        type=str,
-        help="Filter dataset by difficulty (e.g., 'Hard', 'Moderate', 'Easy')",
-    )
     args = parser.parse_args()
-    main(args.config_json, difficulty=args.difficulty)
+    main(args.config_json)
 
 
 if __name__ == "__main__":

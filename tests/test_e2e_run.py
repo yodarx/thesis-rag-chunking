@@ -207,6 +207,7 @@ def test_e2e_run_with_difficulty(e2e_gold_setup):
     with open(config_path) as f:
         config = json.load(f)
     config["input_file"] = str(gold_path)
+    config["difficulty"] = "Hard"
     with open(config_path, "w") as f:
         json.dump(config, f)
 
@@ -226,8 +227,8 @@ def test_e2e_run_with_difficulty(e2e_gold_setup):
         cwd = os.getcwd()
         os.chdir(tmp_path)
         try:
-            # Run with difficulty="Hard"
-            run.main(str(config_path), difficulty="Hard")
+            run.main(str(config_path))
+
 
             # Verify prefix logic
             # embedding: dummy-model

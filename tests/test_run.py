@@ -142,12 +142,13 @@ def test_run_main_with_difficulty(mock_dependencies, mocker):
     with open(config_path) as f:
         config_data = json.load(f)
     config_data["input_file"] = "data/preprocessed/standard.jsonl"
+    config_data["difficulty"] = "Hard"
 
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(config_data)))
     mocker.patch("json.load", return_value=config_data)
     mocker.patch("shutil.copy")
 
-    run.main(config_json=config_path, difficulty="Hard")
+    run.main(config_json=config_path)
 
     # expected format: $embedding_$experimentName_$usedInputFile_$difficulty
     mock_dependencies["create_dir"].assert_called_once_with("test-model_test_experiment_config_standard_Hard")

@@ -2,6 +2,7 @@
   "input_file": "data/preprocessed/gold.jsonl",
   "embedding_model": "test-model",
   "retriever_type": "faiss",
+  "difficulty": "Hard",
   "top_k": 5,
   "experiments": [
     {
