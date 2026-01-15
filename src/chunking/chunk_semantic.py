@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Protocol, Union
 
 from langchain_experimental.text_splitter import SemanticChunker
 
@@ -16,36 +16,42 @@ class LangChainEmbeddingWrapper:
         self.vectorizer = vectorizer
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        return self.vectorizer.embed_documents(texts, batch_size=1024)
+        # Forward the batch to the vectorizer, which handles GPU batching
+        return self.vectorizer.embed_documents(texts, batch_size=2048)
 
     def embed_query(self, text: str) -> list[float]:
         return self.vectorizer.embed_query(text)
 
 
 def chunk_semantic(
-    text: str,
-    *,
-    chunking_embeddings: EmbeddingVectorizer | str,
-    similarity_threshold: float = 0.8,
+        text: Union[str, list[str]],
+        *,
+        chunking_embeddings: Union[EmbeddingVectorizer, str],
+        similarity_threshold: float = 0.8,
 ) -> list[str]:
     """
     Splits text based on the semantic similarity of adjacent sentences using LangChain's SemanticChunker.
 
+    Supports batch processing by accepting a list of strings.
+
     Args:
-        text: The text to chunk
+        text: The text to chunk (str) or a list of texts to chunk (list[str]).
         chunking_embeddings: Embedding model used for determining semantic chunk boundaries.
                             Can be either:
                             - An EmbeddingVectorizer instance (for testing)
                             - A string model name (loaded by ExperimentRunner)
-                            This is separate from retrieval embeddings to maintain scientific validity.
         similarity_threshold: Threshold for semantic similarity (0-1). Higher values create fewer, larger chunks.
-
-    Note:
-        For scientific experiments, the chunking embeddings should be specified separately from
-        retrieval embeddings to avoid confounding variables. When chunking_embeddings is a string,
-        it will be resolved to a Vectorizer instance by the ExperimentRunner.
     """
     if not text:
+        return []
+
+    # 1. Normalize input to a list of strings
+    texts = [text] if isinstance(text, str) else text
+
+    # Filter out empty strings to prevent errors in embeddings
+    texts = [t for t in texts if t and t.strip()]
+
+    if not texts:
         return []
 
     if isinstance(chunking_embeddings, str):
@@ -64,5 +70,6 @@ def chunk_semantic(
         breakpoint_threshold_amount=breakpoint_percentile,
     )
 
-    chunks = text_splitter.create_documents([text])
+    chunks = text_splitter.create_documents(texts)
+
     return [doc.page_content for doc in chunks]

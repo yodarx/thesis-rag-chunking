@@ -28,66 +28,105 @@ def get_chunking_function(name: str) -> Callable[..., list[str]]:
 
 
 def generate_chunks(
-        exp_config: dict[str, Any],
+        experiment: dict[str, Any],
         dataset: list[dict[str, Any]],
-        vectorizer: Vectorizer,
+        vectorizer: Vectorizer | None,
         cache_dir: str
 ) -> list[str]:
     """
-    Loads chunks from cache or generates them if not present.
+    Generates chunks for a dataset based on experiment configuration,
+    with caching and optimized batch processing for semantic chunking.
     """
-    name = exp_config["name"]
-    func_name = exp_config["function"]
+    name = experiment["name"]
+    func_name = experiment["function"]
+    params = experiment.get("params", {})
 
-    # Create a directory for the experiment chunks
+    # Resolve the function
+    chunk_func = get_chunking_function(func_name)
+
+    # 1. Setup Paths
     exp_dir = os.path.join(cache_dir, name)
     os.makedirs(exp_dir, exist_ok=True)
 
-    cache_name = "chunks.json"
-    metadata_name = "metadata.json"
-    cache_path = os.path.join(exp_dir, cache_name)
-    metadata_path = os.path.join(exp_dir, metadata_name)
+    cache_path = os.path.join(exp_dir, "chunks.json")
+    metadata_path = os.path.join(exp_dir, "metadata.json")
+    sorted_cache_path = os.path.join(exp_dir, "chunks_SORTED.json")
 
+    # 2. Check Cache
     if os.path.exists(cache_path):
-        print(f"[{name}] Lade Chunks aus Cache...")
+        print(f"[{name}] Loading chunks from cache: {cache_path}")
         with open(cache_path) as f:
             chunks = json.load(f)
 
-        # Ensure sorted chunks exist
-        sorted_cache_path = os.path.join(exp_dir, "chunks_SORTED.json")
+        # Ensure sorted version exists (self-healing cache)
         if not os.path.exists(sorted_cache_path):
-            print(f"[{name}] Sorted chunks missing. Generating sorted file...")
+            print(f"[{name}] Sorted chunks missing. Generating...")
             sorted_chunks = sorted(chunks, key=len)
             with open(sorted_cache_path, "w") as f:
                 json.dump(sorted_chunks, f)
 
         return chunks
 
-    print(f"[{name}] ⚠️ Cache Miss! Generiere Chunks...")
-    chunk_func = get_chunking_function(func_name)
-    params = exp_config.get("params", {})
-
-    # Copy params and inject vectorizer if needed
+    # 3. Prepare Parameters
     call_params = params.copy()
     if func_name == "chunk_semantic":
+        if vectorizer is None:
+            raise ValueError(f"Experiment '{name}' requires a loaded Vectorizer.")
         call_params["chunking_embeddings"] = vectorizer
+
+    # 4. Processing Loop (Batched)
     chunks = []
     start_time = time.time()
+
+    # BATCH CONFIGURATION
+    # 64 is a safe sweet spot for 24GB VRAM.
+    # If OOM occurs, lower to 32. If GPU util is low, raise to 128.
+    BATCH_SIZE = 64 if func_name == "chunk_semantic" else 1
+
+    total_docs = len(dataset)
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    for i, d in enumerate(tqdm(dataset, desc=f"Chunking ({name})")):
-        text = d.get("document_text", "")
-        chunks.extend(chunk_func(text, **call_params))
+    # Iterate in batches
+    for i in tqdm(range(0, total_docs, BATCH_SIZE), desc=f"Chunking ({name})"):
+        # Slice batch
+        batch_slice = dataset[i: i + BATCH_SIZE]
+        batch_texts = [d.get("document_text", "") for d in batch_slice]
 
-        if i % 50 == 0 and torch.cuda.is_available():
+        # Skip empty batches
+        if not batch_texts:
+            continue
+
+        try:
+            if func_name == "chunk_semantic":
+                # FAST PATH: Send whole list to GPU at once
+                # Note: chunk_semantic must accept list[str]
+                batch_chunks = chunk_func(batch_texts, **call_params)
+                chunks.extend(batch_chunks)
+            else:
+                # STANDARD PATH: Iterate manually (fixed/recursive/sentence)
+                for text in batch_texts:
+                    if text:  # Skip empty strings
+                        chunks.extend(chunk_func(text, **call_params))
+
+        except TypeError as e:
+            # Fallback/Debug hint if chunk_semantic wasn't updated
+            if "list" in str(e) and func_name == "chunk_semantic":
+                raise TypeError(
+                    "Error: Your 'chunk_semantic' function does not accept lists yet. "
+                    "Please update src/chunking/chunk_semantic.py to handle List[str]."
+                ) from e
+            raise e
+
+        # Periodic GPU Cleanup
+        if torch.cuda.is_available() and i % (BATCH_SIZE * 5) == 0:
             torch.cuda.empty_cache()
 
     end_time = time.time()
     duration = end_time - start_time
 
-    # Calculate statistics
+    # 5. Statistics & Saving
     total_chunks = len(chunks)
     chunks_per_second = total_chunks / duration if duration > 0 else 0
     total_chars = sum(len(c) for c in chunks)
@@ -104,23 +143,24 @@ def generate_chunks(
         "processing_time_seconds": duration,
         "chunks_per_second": chunks_per_second,
         "timestamp": datetime.now().isoformat(),
+        "device": Vectorizer.get_device() if func_name == "chunk_semantic" else "cpu"
     }
 
+    # Save Standard
     with open(cache_path, "w") as f:
         json.dump(chunks, f)
 
+    # Save Metadata
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2)
 
-    # Save sorted chunks
-    sorted_cache_path = os.path.join(exp_dir, "chunks_SORTED.json")
+    # Save Sorted
     print(f"[{name}] Saving sorted chunks to {sorted_cache_path}...")
     sorted_chunks = sorted(chunks, key=len)
     with open(sorted_cache_path, "w") as f:
         json.dump(sorted_chunks, f)
 
     return chunks
-
 
 def main():
     parser = argparse.ArgumentParser(description="Generate chunks based on experiment config")
