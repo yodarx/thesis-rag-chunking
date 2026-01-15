@@ -16,7 +16,7 @@ class LangChainEmbeddingWrapper:
         self.vectorizer = vectorizer
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        return self.vectorizer.embed_documents(texts, batch_size=2048)
+        return self.vectorizer.embed_documents(texts, batch_size=1024)
 
     def embed_query(self, text: str) -> list[float]:
         return self.vectorizer.embed_query(text)
