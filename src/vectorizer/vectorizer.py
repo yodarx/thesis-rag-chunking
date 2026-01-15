@@ -1,4 +1,5 @@
 import contextlib
+
 import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
@@ -21,12 +22,12 @@ class Vectorizer:
             loaded_model.half()
 
         # 2. TORCH COMPILE (Turbo für Nvidia L4 / A100)
-        if hasattr(torch, "compile") and device == "cuda":
-            try:
-                print("Compiling model with torch.compile for max speed...")
-                loaded_model = torch.compile(loaded_model)
-            except Exception as e:
-                print(f"Could not compile model (continuing normally): {e}")
+        # if hasattr(torch, "compile") and device == "cuda":
+        #    try:
+        #       print("Compiling model with torch.compile for max speed...")
+        #      loaded_model = torch.compile(loaded_model)
+        # except Exception as e:
+        #    print(f"Could not compile model (continuing normally): {e}")
 
         return cls(loaded_model)
 
