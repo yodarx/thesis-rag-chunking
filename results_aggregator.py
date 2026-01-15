@@ -57,6 +57,9 @@ class GCSDownloader:
                 self._download_blob(blob)
 
     def _is_relevant_file(self, filename: str) -> bool:
+        if "/archive/" in filename:
+            return False
+
         return (
                 filename.endswith("metadata.json") or
                 filename.endswith("_detailed_resulsts.csv")
@@ -115,7 +118,7 @@ class ResultProcessor:
 
         all_rows = []
         for folder in results_root.iterdir():
-            if folder.is_dir():
+            if folder.is_dir() and folder.name not in ("archive", "_archive"):
                 all_rows.extend(self._process_experiment_folder(folder))
 
         return pd.DataFrame(all_rows)

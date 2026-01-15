@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
-from results_aggregator import ResultProcessor, MetadataService, FileSystemManager
+from results_aggregator import ResultProcessor, MetadataService, FileSystemManager, GCSDownloader
 
 
 class TestPipeline(unittest.TestCase):
@@ -70,6 +70,48 @@ class TestPipeline(unittest.TestCase):
         """Ensures missing files return empty dicts instead of crashing."""
         result = FileSystemManager.read_json(Path("fake.json"))
         self.assertEqual(result, {})
+
+    def test_process_all_results_ignores_archive(self):
+        """Ensures that folders named 'archive' are skipped during processing."""
+        # Mock filesystem
+        mock_root = MagicMock(spec=Path)
+        mock_root.exists.return_value = True
+
+        dir1 = MagicMock(spec=Path)
+        dir1.is_dir.return_value = True
+        dir1.name = "valid_exp"
+
+        dir2 = MagicMock(spec=Path)
+        dir2.is_dir.return_value = True
+        dir2.name = "archive"
+
+        dir3 = MagicMock(spec=Path)
+        dir3.is_dir.return_value = True
+        dir3.name = "_archive"
+
+        mock_root.iterdir.return_value = [dir1, dir2, dir3]
+
+        # Mock internal processing method to avoid IO
+        with patch.object(self.processor, '_process_experiment_folder', return_value=[{"res": 1}]) as mock_process:
+            df = self.processor.process_all_results(mock_root)
+
+            # Should have called process only for dir1
+            mock_process.assert_called_once_with(dir1)
+            self.assertEqual(len(df), 1)
+
+    def test_gcs_downloader_is_relevant_file_ignores_archive(self):
+        """Test that GCSDownloader ignores files in archive."""
+        # We can test the private method directly or via public interface if feasible.
+        # Since _is_relevant_file is what we changed and it is stateless logic (mostly),
+        # passing mocks to init might be needed or just mocking.
+        # But GCSDownloader init creates client. We should mock that.
+        with patch("google.cloud.storage.Client"):
+            downloader = GCSDownloader("test-bucket")
+
+            self.assertTrue(downloader._is_relevant_file("data/results/exp1/metadata.json"))
+            self.assertFalse(downloader._is_relevant_file("data/results/archive/exp1/metadata.json"))
+            self.assertFalse(downloader._is_relevant_file("data/chunks/archive/exp1/metadata.json"))
+            self.assertTrue(downloader._is_relevant_file("data/chunks/exp1/metadata.json"))
 
 
 if __name__ == "__main__":
