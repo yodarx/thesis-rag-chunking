@@ -29,7 +29,6 @@ for config in $CONFIG_FILES; do
 
         echo "" | tee -a "$LOGFILE"
     else
-        # Difficulties loop for non-silver configs
         for difficulty in "Hard" "Moderate" "Easy"; do
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] >>> RUNNING: Config=$config | Difficulty=$difficulty" | tee -a "$LOGFILE"
 

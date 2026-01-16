@@ -132,7 +132,7 @@ def generate_chunks(
         "processing_time_seconds": duration,
         "chunks_per_second": chunks_per_second,
         "timestamp": datetime.now().isoformat(),
-        "device": Vectorizer.get_device() if func_name == "chunk_semantic" else "cpu",
+        "device": "cuda" if func_name == "chunk_semantic" and torch.cuda.is_available() else "cpu",
     }
 
     # Save Standard
