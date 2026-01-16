@@ -47,18 +47,13 @@ class ExperimentRunner:
 
     def _get_index_paths(self, experiment: dict[str, Any]) -> tuple[str, str]:
         experiment_name: str = experiment["name"]
-        function_name: str = experiment["function"]
 
         index_folder_name: str = create_index_name(experiment_name, self.embedding_model_name)
         index_dir: str = os.path.join("data", "indices", index_folder_name)
         index_path: str = os.path.join(index_dir, "index.faiss")
 
-        # Fallback-Logik für Dateinamen (Original vs. Hash)
-        # Wir nehmen hier vereinfacht den Standard-Pfad an.
-        # Falls du das Hash-System nutzt, musst du hier ggf. die Logik anpassen.
-        id_str = f"{experiment_name}_{function_name}"
-        chunks_filename = f"{experiment_name}_{id_str}_chunks_SORTED.json"
-        chunks_path: str = os.path.join("data", "chunks", chunks_filename)
+        chunks_path: str = os.path.join("data", "chunks", experiment_name, "chunks_SORTED.json")
+        chunks_path = os.path.abspath(chunks_path)
 
         return index_path, chunks_path
 
