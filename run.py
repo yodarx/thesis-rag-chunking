@@ -35,7 +35,7 @@ def generate_experiment_prefix(
 ) -> str:
     """
     Construct output directory prefix based on experiment parameters.
-    Format: $embedding_$experimentName_$usedInputFile_$difficulty
+    Format: $embedding_$experimentName_$difficulty
     """
     embedding_model = config.get("embedding_model", "unknown").replace("/", "_")
     experiment_name = (
@@ -44,13 +44,7 @@ def generate_experiment_prefix(
         else "unknown_experiment"
     )
 
-    input_file = config.get("input_file")
-    if input_file and isinstance(input_file, str):
-        input_file_name = os.path.splitext(os.path.basename(input_file))[0]
-    else:
-        input_file_name = "unknown_input"
-
-    parts = [embedding_model, experiment_name, input_file_name]
+    parts = [embedding_model, experiment_name]
     if difficulty:
         parts.append(difficulty)
 

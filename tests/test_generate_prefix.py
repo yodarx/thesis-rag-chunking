@@ -10,12 +10,10 @@ def test_generate_experiment_prefix_standard():
     config_path = "configs/experiment.json"
 
     prefix = generate_experiment_prefix(config, config_path)
-    # embedding: BAAI_bge-large-en-v1.5 -> BAAI_bge-large-en-v1.5 (replace only if needed, but my logic was replace("/", "_"))
-    # BAAI/bge-large-en-v1.5 -> BAAI_bge-large-en-v1.5
+    # embedding: BAAI/bge-large-en-v1.5 -> BAAI_bge-large-en-v1.5
     # experiment: experiment
-    # input: test_gold
-    # expected: BAAI_bge-large-en-v1.5_experiment_test_gold
-    assert prefix == "BAAI_bge-large-en-v1.5_experiment_test_gold"
+    # expected: BAAI_bge-large-en-v1.5_experiment
+    assert prefix == "BAAI_bge-large-en-v1.5_experiment"
 
 def test_generate_experiment_prefix_with_difficulty():
     config = {
@@ -28,10 +26,9 @@ def test_generate_experiment_prefix_with_difficulty():
     prefix = generate_experiment_prefix(config, config_path, difficulty=difficulty)
     # embedding: mini
     # experiment: h2
-    # input: silver_data
     # difficulty: Hard
-    # expected: mini_h2_silver_data_Hard
-    assert prefix == "mini_h2_silver_data_Hard"
+    # expected: mini_h2_Hard
+    assert prefix == "mini_h2_Hard"
 
 def test_generate_experiment_prefix_missing_input_file():
     config = {
@@ -42,8 +39,8 @@ def test_generate_experiment_prefix_missing_input_file():
     prefix = generate_experiment_prefix(config, config_path)
     # embedding: model
     # experiment: config
-    # input: unknown_input
-    assert prefix == "model_config_unknown_input"
+    # expected: model_config
+    assert prefix == "model_config"
 
 def test_generate_experiment_prefix_no_config_path():
     config = {
