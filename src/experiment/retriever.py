@@ -29,6 +29,15 @@ class FaissRetriever:
         print(f"Loading chunks from {chunks_path}...")
         with open(chunks_path, encoding="utf-8") as f:
             self.chunks = json.load(f)
+
+        if self.index.ntotal != len(self.chunks):
+            raise RuntimeError(
+                f"❌ Index/Chunks Mismatch!\n"
+                f"Index ({index_path}) has {self.index.ntotal} vectors.\n"
+                f"Chunks ({chunks_path}) has {len(self.chunks)} entries.\n"
+                f"Check if you regenerated chunks but didn't rebuild the index."
+            )
+
         print("Index and chunks loaded.")
 
     def retrieve(self, query: str, top_k: int) -> list[str]:

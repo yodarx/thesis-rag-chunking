@@ -2,7 +2,7 @@
   "embedding_model": "all-MiniLM-L6-v2",
   "retriever_type": "faiss",
   "top_k": 20,
-  "difficulty_level": "Easy",
+  "difficulty": "Easy",
   "input_file": "data/preprocessed/gold.jsonl",
   "experiments": [
     {

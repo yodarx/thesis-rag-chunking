@@ -204,8 +204,25 @@ def process_experiment(exp, config, dataset, vec, out_dir, cache_dir):
 
     # 3. Index bauen
     index_dir = os.path.join(out_dir, create_index_name(name, model_name))
-    if os.path.exists(os.path.join(index_dir, "index.faiss")):
-        print(f"✅ Index {index_dir} existiert bereits. Skip.")
+    index_path = os.path.join(index_dir, "index.faiss")
+    metadata_path = os.path.join(index_dir, "metadata.json")
+
+    should_build = True
+    if os.path.exists(index_path) and os.path.exists(metadata_path):
+        try:
+            with open(metadata_path) as f:
+                meta = json.load(f)
+            if meta.get("num_chunks") == len(chunks):
+                print(f"✅ Index {index_dir} existiert bereits und ist aktuell ({len(chunks)} chunks). Skip.")
+                should_build = False
+            else:
+                 print(f"⚠️ Index {index_dir} existiert, aber Chunk-Anzahl mismatch ({meta.get('num_chunks')} vs {len(chunks)}). Rebuilding...")
+        except Exception as e:
+            print(f"⚠️ Fehler beim Checken der Metadata ({e}). Rebuilding...")
+    elif os.path.exists(index_path):
+        print("⚠️ Index existiert ohne Metadata. Rebuilding um sicher zu sein...")
+
+    if not should_build:
         return
 
     index, duration = build_index_dynamic(chunks, vec, model_name)
