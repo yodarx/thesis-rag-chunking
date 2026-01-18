@@ -65,6 +65,17 @@ class ExperimentRunner:
             return ""
         return re.sub(r'\s+', ' ', text).strip().lower()
 
+    def _extract_text(self, chunk: Any) -> str:
+        """Safely extracts text string from chunk, handling dicts, objects, or raw strings."""
+        if isinstance(chunk, str):
+            return chunk
+        elif isinstance(chunk, dict):
+            return chunk.get("page_content", chunk.get("content", ""))
+        elif hasattr(chunk, "page_content"):
+            return chunk.page_content
+        else:
+            return str(chunk)
+
     def run_all(self) -> pd.DataFrame:
         total_experiments = len(self.experiments)
         total_dataset_size = len(self.dataset)
@@ -146,13 +157,11 @@ class ExperimentRunner:
                         )
 
                         # --- 🕵️‍♂️ FORENSIC ANALYSIS ----------------------------
-                        retrieved_texts = [
-                            c.get("page_content", c.get("content", ""))
-                            for c in retrieved_chunks
-                        ]
+
+                        # FIX: Robustly extract text using the helper method
+                        retrieved_texts = [self._extract_text(c) for c in retrieved_chunks]
 
                         # 1. CHECK FOR "LOST IN THE MIDDLE" (Ranking Failure)
-                        # Found in Top 20, but NOT in Top 5
                         if metrics.get("recall_at_20", 0) > 0 and metrics.get("recall_at_5", 0) == 0:
                             if debug_counters[exp_name]["lost_in_middle"] < MAX_DEBUG_PER_TYPE:
                                 tqdm.write(f"\n📉 [CASE STUDY] LOST IN THE MIDDLE (Ranking Fail)")
@@ -163,7 +172,6 @@ class ExperimentRunner:
                                 tqdm.write("-" * 50)
 
                         # 2. CHECK FOR PARTIAL MULTI-HOP FAILURE
-                        # Question has >1 gold passage, we found SOME but not ALL
                         total_gold = len(data_point["gold_passages"])
                         if total_gold > 1:
                             found_count = 0
