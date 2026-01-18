@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,7 @@ LOCAL_DATA_DIR = Path("data")
 CHUNKS_DIR = LOCAL_DATA_DIR / "chunks"
 INDICES_DIR = LOCAL_DATA_DIR / "indices"
 RESULTS_DIR = LOCAL_DATA_DIR / "results"
-MASTER_CSV_PATH = LOCAL_DATA_DIR / "master_results.csv"
+MASTER_CSV_PATH = RESULTS_DIR / "master_results.csv"
 
 # Configure Logging
 logging.basicConfig(
@@ -42,19 +43,26 @@ class FileSystemManager:
 class GCSDownloader:
     """Responsible for downloading relevant artifacts from Google Cloud Storage."""
 
-    def __init__(self, bucket_name: str, prefix: str = "data"):
+    def __init__(self, bucket_name: str, prefix: str = "results", local_base_dir: Path = LOCAL_DATA_DIR):
         self.bucket_name = bucket_name
         self.prefix = prefix
+        self.local_base_dir = local_base_dir
         self.client = storage.Client()
         self.bucket = self.client.bucket(bucket_name)
 
     def download_metadata_and_results(self) -> None:
         logger.info(f"Starting download from bucket: {self.bucket_name}")
-        blobs = self.bucket.list_blobs(prefix=self.prefix)
 
-        for blob in blobs:
-            if self._is_relevant_file(blob.name):
-                self._download_blob(blob)
+        # We need to check results, chunks, and indices folders
+        prefixes = ["results", "chunks", "indices"]
+
+        for prefix in prefixes:
+            logger.info(f"Checking prefix: {prefix}")
+            blobs = self.bucket.list_blobs(prefix=prefix)
+
+            for blob in blobs:
+                if self._is_relevant_file(blob.name):
+                    self._download_blob(blob)
 
     def _is_relevant_file(self, filename: str) -> bool:
         if "/archive/" in filename:
@@ -62,11 +70,23 @@ class GCSDownloader:
 
         return (
                 filename.endswith("metadata.json") or
-                filename.endswith("_detailed_resulsts.csv")
+                filename.endswith("_detailed_results.csv")
         )
 
     def _download_blob(self, blob: Any) -> None:
-        local_path = Path(blob.name)
+        # Determine local path with potential renaming
+        blob_name = blob.name
+
+        # Apply renaming rules
+        if blob_name.startswith("chunks/") and blob_name.endswith("/metadata.json"):
+            # chunks/experiment/metadata.json -> chunks/experiment/chunks_metadata.json
+            blob_name = blob_name.replace("/metadata.json", "/chunks_metadata.json")
+        elif blob_name.startswith("indices/") and blob_name.endswith("/metadata.json"):
+            # indices/exp_model/metadata.json -> indices/exp_model/index_metadata.json
+            blob_name = blob_name.replace("/metadata.json", "/index_metadata.json")
+
+        # Prepend local_base_dir (e.g. "data") to the blob name so it lands in data/results/...
+        local_path = self.local_base_dir / blob_name
         FileSystemManager.ensure_directory(local_path.parent)
 
         if not local_path.exists():
@@ -93,9 +113,9 @@ class MetadataService:
         }
 
     def get_index_metadata(self, experiment_name: str, embedding_model: str) -> dict[str, Any]:
-        """Reads /data/indices/$experimentName_$embeddingModel/metadata.json"""
+        """Reads /data/indices/$experimentName_$embeddingModel/index_metadata.json"""
         folder_name = f"{experiment_name}_{embedding_model}"
-        path = self.indices_dir / folder_name / "metadata.json"
+        path = self.indices_dir / folder_name / "index_metadata.json"
         data = FileSystemManager.read_json(path)
 
         return {
@@ -118,49 +138,90 @@ class ResultProcessor:
 
         all_rows = []
         for folder in results_root.iterdir():
-            if folder.is_dir() and folder.name not in ("archive", "_archive"):
+            if folder.is_dir() and "archive" not in folder.name:
                 all_rows.extend(self._process_experiment_folder(folder))
 
         return pd.DataFrame(all_rows)
 
     def _process_experiment_folder(self, folder_path: Path) -> list[dict[str, Any]]:
-        # 1. Read Folder Metadata
-        folder_meta = FileSystemManager.read_json(folder_path / "metadata.json")
-        embedding_model = folder_meta.get("embedding_model", "unknown")
-        dataset_size = folder_meta.get("dataset_size")
-        difficulty = folder_meta.get("difficulty")
+        folder_name = folder_path.name
+
+        match = re.search(r'^(.*?)_(0[12]_.*)$', folder_name)
+        if match:
+            embedding_model = match.group(1)
+            rest = match.group(2)
+        else:
+            logger.warning(f"Could not parse folder name: {folder_name}")
+            # Fallback to metadata if available
+            folder_meta = FileSystemManager.read_json(folder_path / "metadata.json")
+            embedding_model = folder_meta.get("embedding_model", "unknown")
+            rest = folder_name
+
+        # Parse difficulty from 'rest'
+        difficulty = "All"
+        experiment_config = rest
+
+        for diff in ["Easy", "Hard", "Moderate"]:
+            if rest.endswith(f"_{diff}"):
+                difficulty = diff
+                # Remove suffix: 01_gold_easy_Easy -> 01_gold_easy
+                experiment_config = rest[:-(len(diff)+1)]
+                break
 
         # 2. Find CSVs (handle naming inconsistencies)
-        csv_files = list(folder_path.glob("*_detailed_resulsts.csv")) + \
-                    list(folder_path.glob("*_detailed_results.csv"))
+        csv_files = list(folder_path.glob("*_detailed_results.csv"))
 
         enriched_rows = []
         for csv_file in csv_files:
             try:
-                # pandas reads ALL columns automatically, including 'retrieval_time'
-                df = pd.read_csv(csv_file)
+                # pandas reads ALL columns automatically.
+                # Use sep='\t' for tab-separated files as per user sample
+                # The prompt shows tab-like structure for the CSV.
+                try:
+                    df = pd.read_csv(csv_file, sep='\t')
+                    if len(df.columns) < 2:
+                        # Fallback to comma if tab parse failed (e.g. single col read)
+                        df = pd.read_csv(csv_file)
+                except Exception:
+                    df = pd.read_csv(csv_file)
+
                 for _, row in df.iterrows():
                     enriched_rows.append(
-                        self._enrich_row(row.to_dict(), embedding_model, difficulty, dataset_size)
+                        self._enrich_row(row.to_dict(), embedding_model, difficulty, experiment_config)
                     )
             except Exception as e:
                 logger.error(f"Error processing {csv_file}: {e}")
 
         return enriched_rows
 
-    def _enrich_row(self, row: dict[str, Any], embedding: str, difficulty: str, size: Any) -> dict[str, Any]:
-        experiment_name = row.get("experiment")
+    def _enrich_row(self, row: dict[str, Any], embedding: str, difficulty: str, config_name: str) -> dict[str, Any]:
+        chunking_strategy = row.get("experiment") # e.g. 'sentence_s1'
 
         # Add Context
         row["embedding_model"] = embedding
         row["config_difficulty"] = difficulty
-        row["dataset_size"] = size
+        row["experiment_config"] = config_name
 
-        if experiment_name:
-            # Add Chunking Data
-            row.update(self.metadata_service.get_chunk_metadata(str(experiment_name)))
+        # Determine dataset type (Gold/Silver)
+        config_lower = config_name.lower()
+        if "gold" in config_lower:
+            row["dataset_type"] = "Gold"
+        elif "silver" in config_lower:
+            row["dataset_type"] = "Silver"
+        else:
+            row["dataset_type"] = "Unknown"
+
+        if chunking_strategy:
+            # Add Chunking Data (avg_chars, etc not in CSV)
+            # Row already has chunking_time_s, num_chunks
+            chunk_meta = self.metadata_service.get_chunk_metadata(str(chunking_strategy))
+            # Only add keys that don't exist? Or overwrite?
+            # CSV has `chunking_time_s`. Metadata has `chunk_processing_time_s`.
+            # I'll add all, user can decide which to use.
+            row.update(chunk_meta)
+
             # Add Indexing Data
-            row.update(self.metadata_service.get_index_metadata(str(experiment_name), embedding))
+            row.update(self.metadata_service.get_index_metadata(str(chunking_strategy), embedding))
 
         return row
 

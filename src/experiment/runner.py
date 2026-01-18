@@ -1,6 +1,8 @@
 import os
 import time
+import re
 from typing import Any
+import difflib  # For fuzzy matching
 
 import pandas as pd
 from tqdm import tqdm
@@ -57,10 +59,16 @@ class ExperimentRunner:
 
         return index_path, chunks_path
 
+    def _normalize(self, text: str) -> str:
+        """Normalizes text for robust matching (lowercase, single spaces)."""
+        if not text:
+            return ""
+        return re.sub(r'\s+', ' ', text).strip().lower()
+
     def run_all(self) -> pd.DataFrame:
         total_experiments = len(self.experiments)
         total_dataset_size = len(self.dataset)
-        BATCH_SIZE = 64  # GPU Batch Size
+        BATCH_SIZE = 64
 
         print(f"🚀 Starting Benchmark Pipeline")
         print(f"==================================================")
@@ -70,8 +78,21 @@ class ExperimentRunner:
         print(f"Top-K             : {self.top_k}")
         print(f"==================================================\n")
 
+        # Counters to ensure we get a variety of examples without spamming
+        debug_counters = {}
+        MAX_DEBUG_PER_TYPE = 2  # Limits examples per failure type PER strategy
+
         for i_exp, experiment in enumerate(self.experiments, 1):
             exp_name: str = experiment["name"]
+
+            # Init counters for this strategy
+            if exp_name not in debug_counters:
+                debug_counters[exp_name] = {
+                    "fragmentation": 0,
+                    "near_miss": 0,
+                    "lost_in_middle": 0,
+                    "partial_hop": 0
+                }
 
             print(f"▶ Experiment {i_exp}/{total_experiments}: {exp_name}")
 
@@ -84,40 +105,38 @@ class ExperimentRunner:
                 print(f"   ⚠️  Chunks not found: {chunks_path}. Skipping.")
                 continue
 
-            # Index laden
+            # Load Index
             print(f"   Loading Index...", end="\r")
             self.retriever.load_index(index_path, chunks_path)
             print(f"   Index Loaded ({self.retriever.index.ntotal} documents). Starting Retrieval...")
 
-            # Zeitmessung für das gesamte Experiment
             exp_start_time = time.time()
 
             # --- PROGRESS BAR SETUP ---
-            # Wir nutzen 'total' als Anzahl der Fragen, nicht Batches. Das ist lesbarer.
             with tqdm(total=total_dataset_size, unit="q", desc=f"   Processing", ncols=100) as pbar:
 
                 for i in range(0, total_dataset_size, BATCH_SIZE):
-                    # 1. Batch erstellen
+                    # 1. Create Batch
                     batch_data = self.dataset[i: i + BATCH_SIZE]
                     batch_questions = [d["question"] for d in batch_data]
                     current_batch_size = len(batch_questions)
 
-                    # 2. Batch Retrieval (GPU)
+                    # 2. Batch Retrieval
                     batch_start_time = time.time()
                     try:
                         batch_retrieved_chunks = self.retriever.retrieve_batch(batch_questions, self.top_k)
                     except AttributeError:
-                        # Fallback
                         batch_retrieved_chunks = [self.retriever.retrieve(q, self.top_k) for q in batch_questions]
+
                     batch_duration = time.time() - batch_start_time
                     avg_retrieval_time = batch_duration / current_batch_size if current_batch_size > 0 else 0
 
-                    # 3. Metriken & Speichern (CPU)
+                    # 3. Metrics & Forensic Debugging
                     for j, data_point in enumerate(batch_data):
                         retrieved_chunks = batch_retrieved_chunks[j]
                         log_matches: bool = experiment.get("log_matches", False)
 
-                        # Haupt-Metrik
+                        # Standard Metrics
                         metrics: dict[str, float] = evaluation.calculate_metrics(
                             retrieved_chunks=retrieved_chunks,
                             gold_passages=data_point["gold_passages"],
@@ -126,7 +145,86 @@ class ExperimentRunner:
                             log_matches=log_matches,
                         )
 
-                        # Zusätzliche k-Werte (für Plots später wichtig)
+                        # --- 🕵️‍♂️ FORENSIC ANALYSIS ----------------------------
+                        retrieved_texts = [
+                            c.get("page_content", c.get("content", ""))
+                            for c in retrieved_chunks
+                        ]
+
+                        # 1. CHECK FOR "LOST IN THE MIDDLE" (Ranking Failure)
+                        # Found in Top 20, but NOT in Top 5
+                        if metrics.get("recall_at_20", 0) > 0 and metrics.get("recall_at_5", 0) == 0:
+                            if debug_counters[exp_name]["lost_in_middle"] < MAX_DEBUG_PER_TYPE:
+                                tqdm.write(f"\n📉 [CASE STUDY] LOST IN THE MIDDLE (Ranking Fail)")
+                                tqdm.write(f"   Strategy: {exp_name}")
+                                tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
+                                tqdm.write(f"   Diagnosis: Answer found but ranked > 5. Needs Re-Ranking.")
+                                debug_counters[exp_name]["lost_in_middle"] += 1
+                                tqdm.write("-" * 50)
+
+                        # 2. CHECK FOR PARTIAL MULTI-HOP FAILURE
+                        # Question has >1 gold passage, we found SOME but not ALL
+                        total_gold = len(data_point["gold_passages"])
+                        if total_gold > 1:
+                            found_count = 0
+                            for gold in data_point["gold_passages"]:
+                                norm_gold = self._normalize(gold)
+                                if any(norm_gold in self._normalize(t) for t in retrieved_texts[:10]):
+                                    found_count += 1
+
+                            if 0 < found_count < total_gold:
+                                if debug_counters[exp_name]["partial_hop"] < MAX_DEBUG_PER_TYPE:
+                                    tqdm.write(f"\n🧩 [CASE STUDY] PARTIAL MULTI-HOP (Reasoning Fail)")
+                                    tqdm.write(f"   Strategy: {exp_name}")
+                                    tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
+                                    tqdm.write(f"   Question: {data_point['question']}")
+                                    tqdm.write(f"   Found: {found_count}/{total_gold} required text segments.")
+                                    tqdm.write(f"   Diagnosis: Context disconnected. Reasoning chain broken.")
+                                    debug_counters[exp_name]["partial_hop"] += 1
+                                    tqdm.write("-" * 50)
+
+                        # 3. & 4. CHECK FOR FRAGMENTATION & NEAR MISS (If Recall=0)
+                        if metrics["recall_at_10"] == 0.0:
+                            for gold in data_point["gold_passages"]:
+                                norm_gold = self._normalize(gold)
+                                if not norm_gold: continue
+
+                                # FRAGMENTATION CHECK
+                                combined_top_5 = " ".join([self._normalize(t) for t in retrieved_texts[:5]])
+                                if norm_gold in combined_top_5:
+                                    if debug_counters[exp_name]["fragmentation"] < MAX_DEBUG_PER_TYPE:
+                                        tqdm.write(f"\n🔥 [CASE STUDY] FRAGMENTATION DETECTED")
+                                        tqdm.write(f"   Strategy: {exp_name}")
+                                        tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
+                                        tqdm.write(f"   Gold: '{gold[:60]}...'")
+                                        tqdm.write(f"   Diagnosis: Answer split across Top 5 chunks.")
+                                        debug_counters[exp_name]["fragmentation"] += 1
+                                        tqdm.write("-" * 50)
+                                    break
+
+                                    # NEAR MISS CHECK
+                                else:
+                                    found_near = False
+                                    for idx, chunk_text in enumerate(retrieved_texts[:3]):
+                                        norm_chunk = self._normalize(chunk_text)
+                                        s = difflib.SequenceMatcher(None, norm_gold, norm_chunk)
+                                        match = s.find_longest_match(0, len(norm_gold), 0, len(norm_chunk))
+
+                                        if match.size > len(norm_gold) * 0.8:
+                                            if debug_counters[exp_name]["near_miss"] < MAX_DEBUG_PER_TYPE:
+                                                tqdm.write(f"\n⚠️ [CASE STUDY] NEAR MISS (Strict Metric)")
+                                                tqdm.write(f"   Strategy: {exp_name}")
+                                                tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
+                                                tqdm.write(f"   Overlap: {int(match.size / len(norm_gold) * 100)}%")
+                                                debug_counters[exp_name]["near_miss"] += 1
+                                                tqdm.write("-" * 50)
+                                            found_near = True
+                                            break
+                                    if found_near: break
+
+                        # --- END FORENSIC ANALYSIS ---------------------------
+
+                        # Calculate additional K-levels
                         k_levels: list[int] = [1, 3, 5, 10, 20]
                         for k_val in k_levels:
                             if k_val <= self.top_k:
@@ -151,10 +249,8 @@ class ExperimentRunner:
                             metrics=metrics,
                         )
 
-                    # Update Progress Bar um die Anzahl der verarbeiteten Fragen
                     pbar.update(current_batch_size)
 
-            # Zusammenfassung nach dem Experiment
             duration = time.time() - exp_start_time
             speed = total_dataset_size / duration if duration > 0 else 0
             print(f"   ✅ Finished in {duration:.2f}s ({speed:.1f} q/s)\n")
@@ -168,8 +264,6 @@ class ExperimentRunner:
             return pd.DataFrame()
 
         summary_df: pd.DataFrame = self.results_handler.create_and_save_summary(detailed_df)
-
         self.results_handler.display_summary(summary_df)
 
         return summary_df
-
