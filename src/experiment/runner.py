@@ -158,18 +158,17 @@ class ExperimentRunner:
 
                         # --- 🕵️‍♂️ FORENSIC ANALYSIS ----------------------------
 
-                        # FIX: Robustly extract text using the helper method
+                        # Use helper to safely get text list
                         retrieved_texts = [self._extract_text(c) for c in retrieved_chunks]
 
                         # 1. CHECK FOR "LOST IN THE MIDDLE" (Ranking Failure)
-                        if metrics.get("recall_at_20", 0) > 0 and metrics.get("recall_at_5", 0) == 0:
-                            if debug_counters[exp_name]["lost_in_middle"] < MAX_DEBUG_PER_TYPE:
-                                tqdm.write(f"\n📉 [CASE STUDY] LOST IN THE MIDDLE (Ranking Fail)")
-                                tqdm.write(f"   Strategy: {exp_name}")
-                                tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
-                                tqdm.write(f"   Diagnosis: Answer found but ranked > 5. Needs Re-Ranking.")
-                                debug_counters[exp_name]["lost_in_middle"] += 1
-                                tqdm.write("-" * 50)
+                        # We use .get() to avoid KeyErrors
+                        recall_k = metrics.get("recall_at_k", 0.0)  # Main recall
+
+                        # Note: recall_at_20 / recall_at_5 might not exist yet if k=10
+                        # So we skip this specific check unless we calculated them.
+                        # Instead, we rely on the loops below for detailed metrics.
+                        # BUT for the main debug, we check the PRIMARY recall.
 
                         # 2. CHECK FOR PARTIAL MULTI-HOP FAILURE
                         total_gold = len(data_point["gold_passages"])
@@ -192,7 +191,8 @@ class ExperimentRunner:
                                     tqdm.write("-" * 50)
 
                         # 3. & 4. CHECK FOR FRAGMENTATION & NEAR MISS (If Recall=0)
-                        if metrics["recall_at_10"] == 0.0:
+                        # FIX: Check 'recall_at_k' which is always present from calculate_metrics
+                        if recall_k == 0.0:
                             for gold in data_point["gold_passages"]:
                                 norm_gold = self._normalize(gold)
                                 if not norm_gold: continue
