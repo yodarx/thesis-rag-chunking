@@ -156,53 +156,60 @@ class ExperimentRunner:
                             log_matches=log_matches,
                         )
 
-                        # --- 🕵️‍♂️ FORENSIC ANALYSIS ----------------------------
+                        # --- 🕵️‍♂️ FORENSIC ANALYSIS (VERBOSE MODE) ----------------
 
                         # Use helper to safely get text list
                         retrieved_texts = [self._extract_text(c) for c in retrieved_chunks]
 
                         # 1. CHECK FOR "LOST IN THE MIDDLE" (Ranking Failure)
-                        recall_k = metrics.get("recall_at_k", 0.0)
-
                         if metrics.get("recall_at_20", 0) > 0 and metrics.get("recall_at_5", 0) == 0:
                             if debug_counters[exp_name]["lost_in_middle"] < MAX_DEBUG_PER_TYPE:
                                 tqdm.write(f"\n📉 [CASE STUDY] LOST IN THE MIDDLE (Ranking Fail)")
                                 tqdm.write(f"   Strategy: {exp_name}")
                                 tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
-                                tqdm.write(f"   Diagnosis: Answer found but ranked > 5.")
+                                tqdm.write(f"   Diagnosis: Answer found at Rank > 5.")
                                 debug_counters[exp_name]["lost_in_middle"] += 1
                                 tqdm.write("-" * 50)
 
-                        # 2. CHECK FOR PARTIAL MULTI-HOP FAILURE (Updated with Text Printing)
+                        # 2. CHECK FOR PARTIAL MULTI-HOP FAILURE
                         total_gold = len(data_point["gold_passages"])
                         if total_gold > 1:
                             found_gold_texts = []
                             missed_gold_texts = []
+                            found_chunks_indices = []
 
                             for gold in data_point["gold_passages"]:
                                 norm_gold = self._normalize(gold)
-                                if any(norm_gold in self._normalize(t) for t in retrieved_texts[:10]):
-                                    found_gold_texts.append(gold)
-                                else:
+                                found_this = False
+                                for idx, t in enumerate(retrieved_texts[:10]):
+                                    if norm_gold in self._normalize(t):
+                                        found_gold_texts.append(gold)
+                                        found_chunks_indices.append(idx)
+                                        found_this = True
+                                        break
+                                if not found_this:
                                     missed_gold_texts.append(gold)
 
                             if len(found_gold_texts) > 0 and len(missed_gold_texts) > 0:
                                 if debug_counters[exp_name]["partial_hop"] < MAX_DEBUG_PER_TYPE:
                                     tqdm.write(f"\n🧩 [CASE STUDY] PARTIAL MULTI-HOP (Reasoning Fail)")
                                     tqdm.write(f"   Strategy: {exp_name}")
-                                    tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
                                     tqdm.write(f"   Question: {data_point['question']}")
+                                    tqdm.write(f"   Diagnosis: Context disconnected. Found Premise, missed Conclusion.")
 
-                                    # PRINT EVIDENCE
-                                    tqdm.write(f"   ✅ FOUND PART:   '{found_gold_texts[0][:100]}...'")
-                                    tqdm.write(f"   ❌ MISSED PART:  '{missed_gold_texts[0][:100]}...'")
+                                    # PRINT FULL EVIDENCE
+                                    tqdm.write(f"\n   [What we FOUND (Chunk {found_chunks_indices[0]})]:")
+                                    # Print full chunk content so you can see the context
+                                    tqdm.write(f"   \"{retrieved_texts[found_chunks_indices[0]]}\"")
 
-                                    tqdm.write(f"   Diagnosis: Context disconnected. Reasoning chain broken.")
+                                    tqdm.write(f"\n   [What we MISSED (Gold Passage)]: ")
+                                    tqdm.write(f"   \"{missed_gold_texts[0]}\"")
+
                                     debug_counters[exp_name]["partial_hop"] += 1
                                     tqdm.write("-" * 50)
 
                         # 3. & 4. CHECK FOR FRAGMENTATION & NEAR MISS (If Recall=0)
-                        if recall_k == 0.0:
+                        if metrics.get("recall_at_k", 0.0) == 0.0:
                             for gold in data_point["gold_passages"]:
                                 norm_gold = self._normalize(gold)
                                 if not norm_gold: continue
@@ -213,9 +220,17 @@ class ExperimentRunner:
                                     if debug_counters[exp_name]["fragmentation"] < MAX_DEBUG_PER_TYPE:
                                         tqdm.write(f"\n🔥 [CASE STUDY] FRAGMENTATION DETECTED")
                                         tqdm.write(f"   Strategy: {exp_name}")
-                                        tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
-                                        tqdm.write(f"   Gold: '{gold[:80]}...'")
+                                        tqdm.write(f"   Question: {data_point['question']}")
                                         tqdm.write(f"   Diagnosis: Answer split across Top 5 chunks.")
+
+                                        tqdm.write(f"\n   [The Split Evidence]:")
+                                        # Print Top 2 chunks fully to show the cut
+                                        tqdm.write(f"   Chunk 1: \"{retrieved_texts[0]}\"")
+                                        tqdm.write(f"   Chunk 2: \"{retrieved_texts[1]}\"")
+
+                                        tqdm.write(f"\n   [The Gold Answer]:")
+                                        tqdm.write(f"   \"{gold}\"")
+
                                         debug_counters[exp_name]["fragmentation"] += 1
                                         tqdm.write("-" * 50)
                                     break
@@ -232,10 +247,14 @@ class ExperimentRunner:
                                             if debug_counters[exp_name]["near_miss"] < MAX_DEBUG_PER_TYPE:
                                                 tqdm.write(f"\n⚠️ [CASE STUDY] NEAR MISS (Strict Metric)")
                                                 tqdm.write(f"   Strategy: {exp_name}")
-                                                tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
-                                                tqdm.write(f"   Gold:  '{gold[:80]}...'")
-                                                tqdm.write(f"   Chunk: '{chunk_text[:80]}...'")
                                                 tqdm.write(f"   Overlap: {int(match.size / len(norm_gold) * 100)}%")
+
+                                                tqdm.write(f"\n   [Retrieved Chunk]:")
+                                                tqdm.write(f"   \"{chunk_text}\"")
+
+                                                tqdm.write(f"\n   [Gold Answer]:")
+                                                tqdm.write(f"   \"{gold}\"")
+
                                                 debug_counters[exp_name]["near_miss"] += 1
                                                 tqdm.write("-" * 50)
                                             found_near = True
