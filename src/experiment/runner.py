@@ -1,15 +1,14 @@
-import difflib  # For fuzzy matching
 import os
-import re
 import time
+import re
 from typing import Any
+import difflib  # For fuzzy matching
 
 import pandas as pd
 from tqdm import tqdm
 
 from src.evaluation import evaluation
 from src.vectorizer.vectorizer import Vectorizer
-
 from .results import ResultsHandler
 from .retriever import FaissRetriever
 
@@ -82,13 +81,13 @@ class ExperimentRunner:
         total_dataset_size = len(self.dataset)
         BATCH_SIZE = 64
 
-        print("🚀 Starting Benchmark Pipeline")
-        print("==================================================")
+        print(f"🚀 Starting Benchmark Pipeline")
+        print(f"==================================================")
         print(f"Total Experiments : {total_experiments}")
         print(f"Dataset Size      : {total_dataset_size} questions")
         print(f"Batch Size        : {BATCH_SIZE}")
         print(f"Top-K             : {self.top_k}")
-        print("==================================================\n")
+        print(f"==================================================\n")
 
         # Counters to ensure we get a variety of examples without spamming
         debug_counters = {}
@@ -118,14 +117,14 @@ class ExperimentRunner:
                 continue
 
             # Load Index
-            print("   Loading Index...", end="\r")
+            print(f"   Loading Index...", end="\r")
             self.retriever.load_index(index_path, chunks_path)
             print(f"   Index Loaded ({self.retriever.index.ntotal} documents). Starting Retrieval...")
 
             exp_start_time = time.time()
 
             # --- PROGRESS BAR SETUP ---
-            with tqdm(total=total_dataset_size, unit="q", desc="   Processing", ncols=100) as pbar:
+            with tqdm(total=total_dataset_size, unit="q", desc=f"   Processing", ncols=100) as pbar:
 
                 for i in range(0, total_dataset_size, BATCH_SIZE):
                     # 1. Create Batch
@@ -163,54 +162,46 @@ class ExperimentRunner:
                         retrieved_texts = [self._extract_text(c) for c in retrieved_chunks]
 
                         # 1. CHECK FOR "LOST IN THE MIDDLE" (Ranking Failure)
-                        # We use .get() to avoid KeyErrors
-                        recall_k = metrics.get("recall_at_k", 0.0)  # Main recall
+                        recall_k = metrics.get("recall_at_k", 0.0)
 
-                        # Note: recall_at_20 / recall_at_5 might not exist yet if k=10
-                        # So we skip this specific check unless we calculated them.
-                        # Instead, we rely on the loops below for detailed metrics.
-                        # BUT for the main debug, we check the PRIMARY recall.
+                        if metrics.get("recall_at_20", 0) > 0 and metrics.get("recall_at_5", 0) == 0:
+                            if debug_counters[exp_name]["lost_in_middle"] < MAX_DEBUG_PER_TYPE:
+                                tqdm.write(f"\n📉 [CASE STUDY] LOST IN THE MIDDLE (Ranking Fail)")
+                                tqdm.write(f"   Strategy: {exp_name}")
+                                tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
+                                tqdm.write(f"   Diagnosis: Answer found but ranked > 5.")
+                                debug_counters[exp_name]["lost_in_middle"] += 1
+                                tqdm.write("-" * 50)
 
-                        # 2. CHECK FOR PARTIAL MULTI-HOP FAILURE
-                        # 2. CHECK FOR PARTIAL MULTI-HOP FAILURE
-                        # Question has >1 gold passage, we found SOME but not ALL
+                        # 2. CHECK FOR PARTIAL MULTI-HOP FAILURE (Updated with Text Printing)
                         total_gold = len(data_point["gold_passages"])
-
                         if total_gold > 1:
                             found_gold_texts = []
                             missed_gold_texts = []
 
-                            # Check each gold passage individually
                             for gold in data_point["gold_passages"]:
                                 norm_gold = self._normalize(gold)
-                                # Check if THIS specific gold text exists in the retrieved chunks
                                 if any(norm_gold in self._normalize(t) for t in retrieved_texts[:10]):
                                     found_gold_texts.append(gold)
                                 else:
                                     missed_gold_texts.append(gold)
 
-                            # If we found at least one, but missed at least one -> PARTIAL FAIL
                             if len(found_gold_texts) > 0 and len(missed_gold_texts) > 0:
                                 if debug_counters[exp_name]["partial_hop"] < MAX_DEBUG_PER_TYPE:
-                                    tqdm.write("\n🧩 [CASE STUDY] PARTIAL MULTI-HOP (Reasoning Fail)")
+                                    tqdm.write(f"\n🧩 [CASE STUDY] PARTIAL MULTI-HOP (Reasoning Fail)")
                                     tqdm.write(f"   Strategy: {exp_name}")
                                     tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
                                     tqdm.write(f"   Question: {data_point['question']}")
-                                    tqdm.write(f"   Status: Found {len(found_gold_texts)}/{total_gold} parts.")
 
-                                    # Show what we found (The Premise)
-                                    tqdm.write(f"   ✅ RETRIEVED: '{found_gold_texts[0][:100]}...'")
+                                    # PRINT EVIDENCE
+                                    tqdm.write(f"   ✅ FOUND PART:   '{found_gold_texts[0][:100]}...'")
+                                    tqdm.write(f"   ❌ MISSED PART:  '{missed_gold_texts[0][:100]}...'")
 
-                                    # Show what we missed (The Conclusion/Link)
-                                    tqdm.write(f"   ❌ MISSED:    '{missed_gold_texts[0][:100]}...'")
-
-                                    tqdm.write(
-                                        "   Diagnosis: The semantic split severed the link between these two facts.")
+                                    tqdm.write(f"   Diagnosis: Context disconnected. Reasoning chain broken.")
                                     debug_counters[exp_name]["partial_hop"] += 1
                                     tqdm.write("-" * 50)
 
                         # 3. & 4. CHECK FOR FRAGMENTATION & NEAR MISS (If Recall=0)
-                        # FIX: Check 'recall_at_k' which is always present from calculate_metrics
                         if recall_k == 0.0:
                             for gold in data_point["gold_passages"]:
                                 norm_gold = self._normalize(gold)
@@ -220,11 +211,11 @@ class ExperimentRunner:
                                 combined_top_5 = " ".join([self._normalize(t) for t in retrieved_texts[:5]])
                                 if norm_gold in combined_top_5:
                                     if debug_counters[exp_name]["fragmentation"] < MAX_DEBUG_PER_TYPE:
-                                        tqdm.write("\n🔥 [CASE STUDY] FRAGMENTATION DETECTED")
+                                        tqdm.write(f"\n🔥 [CASE STUDY] FRAGMENTATION DETECTED")
                                         tqdm.write(f"   Strategy: {exp_name}")
                                         tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
-                                        tqdm.write(f"   Gold: '{gold[:60]}...'")
-                                        tqdm.write("   Diagnosis: Answer split across Top 5 chunks.")
+                                        tqdm.write(f"   Gold: '{gold[:80]}...'")
+                                        tqdm.write(f"   Diagnosis: Answer split across Top 5 chunks.")
                                         debug_counters[exp_name]["fragmentation"] += 1
                                         tqdm.write("-" * 50)
                                     break
@@ -239,9 +230,11 @@ class ExperimentRunner:
 
                                         if match.size > len(norm_gold) * 0.8:
                                             if debug_counters[exp_name]["near_miss"] < MAX_DEBUG_PER_TYPE:
-                                                tqdm.write("\n⚠️ [CASE STUDY] NEAR MISS (Strict Metric)")
+                                                tqdm.write(f"\n⚠️ [CASE STUDY] NEAR MISS (Strict Metric)")
                                                 tqdm.write(f"   Strategy: {exp_name}")
                                                 tqdm.write(f"   QID: {data_point.get('qa_id', 'N/A')}")
+                                                tqdm.write(f"   Gold:  '{gold[:80]}...'")
+                                                tqdm.write(f"   Chunk: '{chunk_text[:80]}...'")
                                                 tqdm.write(f"   Overlap: {int(match.size / len(norm_gold) * 100)}%")
                                                 debug_counters[exp_name]["near_miss"] += 1
                                                 tqdm.write("-" * 50)
