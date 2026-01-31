@@ -24,6 +24,7 @@ except ImportError:
 import csv
 import gc
 import json
+
 import numpy as np
 import torch
 
@@ -133,28 +134,39 @@ def get_or_create_embeddings(experiment_name, chunk_texts, model):
     """
     Checks if embeddings already exist on disk.
     If yes, loads them. If no, encodes and saves them.
+    Explicitly ensures L2 normalization for metric consistency.
     """
     ensure_directory(INDICES_ROOT)
     cache_path = os.path.join(INDICES_ROOT, f"{experiment_name}_embeddings.npy")
+    embeddings = None
 
     if os.path.exists(cache_path):
         tprint(f"   💾 Loading cached embeddings from {cache_path}...")
         try:
-            return np.load(cache_path)
+            embeddings = np.load(cache_path)
         except Exception as e:
             tprint(f"   ⚠️ Cache corrupt, rebuilding: {e}")
+            embeddings = None
 
-    tprint(f"   ⚙️  Encoding {len(chunk_texts)} chunks...")
-    embeddings = model.encode(
-        chunk_texts,
-        normalize_embeddings=True,
-        convert_to_numpy=True,
-        show_progress_bar=True,
-        batch_size=BATCH_SIZE
-    )
+    if embeddings is None:
+        tprint(f"   ⚙️  Encoding {len(chunk_texts)} chunks...")
+        embeddings = model.encode(
+            chunk_texts,
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+            show_progress_bar=True,
+            batch_size=BATCH_SIZE
+        )
+        # Save raw embeddings
+        np.save(cache_path, embeddings)
 
-    # Save for next time (Resume capability)
-    np.save(cache_path, embeddings)
+    # Ensure float32 and contiguous
+    embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
+
+    # CRITICAL: Enforce L2 normalization so dot-product == cosine similarity
+    # This ensures ranking equivalence between IP and L2 distance
+    faiss.normalize_L2(embeddings)
+
     return embeddings
 
 
@@ -235,8 +247,19 @@ def main():
     tprint(f"✅ Loaded {len(gold_data)} Gold Questions.")
 
     # 2. Get Experiments
-    experiments = [d for d in os.listdir(CHUNKS_ROOT) if os.path.isdir(os.path.join(CHUNKS_ROOT, d))]
+    all_experiments = [d for d in os.listdir(CHUNKS_ROOT) if os.path.isdir(os.path.join(CHUNKS_ROOT, d))]
+
+    # Filter based on user request: semantic*, fixed_1024_128, recursive_1024_128, sentence_s10
+    experiments = []
+    for exp in all_experiments:
+        if (exp.startswith("semantic") or
+                exp == "fixed_1024_128" or
+                exp == "recursive_1024_128" or
+                exp == "sentence_s10"):
+            experiments.append(exp)
+
     experiments.sort()
+    tprint(f"🔹 Selected {len(experiments)} experiments for analysis: {experiments}")
 
     # 3. Load Model
     device = get_device()
@@ -253,6 +276,8 @@ def main():
 
     query_embeddings = model.encode(questions, normalize_embeddings=True, convert_to_numpy=True, batch_size=BATCH_SIZE)
     query_embeddings = np.ascontiguousarray(query_embeddings, dtype=np.float32)
+    # CRITICAL: Explicitly normalize queries for valid Cosine/L2 comparison
+    faiss.normalize_L2(query_embeddings)
 
     all_results = []
 
