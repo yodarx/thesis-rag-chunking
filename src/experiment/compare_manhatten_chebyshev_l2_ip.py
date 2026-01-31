@@ -2,23 +2,35 @@ import csv
 import gc
 import json
 import os
-import random
+import sys
 
 import numpy as np
 import torch
 
-# Prevent OpenMP conflicts
+# --- 1. ENVIRONMENT SAFETY (MacOS/Faiss) ---
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
 
 import faiss
 
-# Force single thread for Faiss to prevent contention
+# Force single thread for Faiss to prevent OpenMP crashes on Apple Silicon
 faiss.omp_set_num_threads(1)
 
 from sentence_transformers import SentenceTransformer
 
-# --- PROGRESS BAR SETUP ---
+# --- 2. IMPORT EVALUATION MODULE ---
+# Append parent directory (src/) to sys.path to find evaluation.py
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+try:
+    from evaluation import calculate_metrics
+except ImportError:
+    print("❌ Error: Could not import 'calculate_metrics' from 'evaluation.py'.")
+    sys.exit(1)
+
+# --- 3. PROGRESS BAR SETUP ---
 try:
     from tqdm import tqdm
 
@@ -38,16 +50,17 @@ def tprint(msg):
         print(msg)
 
 
-# --- CONFIGURATION ---
+# --- 4. CONFIGURATION ---
 CHUNKS_ROOT = "../../data/chunks"
+GOLD_DATA_PATH = "../../data/preprocessed/gold.jsonl"
+INDICES_ROOT = "../../data/indices/compare_distance"
+CSV_OUTPUT_FILE = "distance_metric_full_evaluation.csv"
 MODEL_NAME = "BAAI/bge-base-en-v1.5"
-SAMPLE_SIZE = 100
-CSV_OUTPUT_FILE = "chunk_density_comparison.csv"
-BATCH_SIZE = 32  # Adjustable based on GPU VRAM
+BATCH_SIZE = 32
+TOP_K = 10  # We evaluate Precision/Recall @ 10
 
 
 def get_device():
-    # Prioritize CUDA, then MPS (Mac), then CPU
     if torch.cuda.is_available():
         tprint("🚀 Using NVIDIA CUDA")
         return "cuda"
@@ -59,13 +72,42 @@ def get_device():
         return "cpu"
 
 
+def ensure_directory(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
+def load_gold_data(filepath):
+    """Loads dictionary of questions and expected gold passages."""
+    data = []
+    if not os.path.exists(filepath):
+        tprint(f"❌ Gold data not found at {filepath}")
+        return []
+
+    with open(filepath, encoding='utf-8') as f:
+        for line in f:
+            if not line.strip(): continue
+            try:
+                row = json.loads(line)
+                q = row.get('question') or row.get('query')
+                g = row.get('gold_passage') or row.get('positive') or row.get('passages')
+
+                # Normalize gold to list
+                if isinstance(g, str): g = [g]
+
+                if q and g:
+                    data.append({'question': q, 'gold_passages': g})
+            except:
+                continue
+    return data
+
+
 def load_chunks_text_only(filepath):
-    """Loads chunks to get just the text content."""
+    """Loads just the text content of chunks for evaluation matching."""
     try:
         with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
-    except Exception as e:
-        tprint(f"    ⚠️ Failed to read file: {e}")
+    except:
         return []
 
     texts = []
@@ -76,110 +118,101 @@ def load_chunks_text_only(filepath):
                 texts.append(content)
     elif isinstance(data, list) and isinstance(data[0], str):
         texts = [t for t in data if t.strip()]
-
     return texts
 
 
-def process_single_experiment(experiment_name, chunks_file, model, results_accumulator):
-    tprint(f"\n🚀 Experiment: {experiment_name}")
+def get_or_create_embeddings(experiment_name, chunk_texts, model):
+    """
+    Checks if embeddings already exist on disk.
+    If yes, loads them. If no, encodes and saves them.
+    """
+    ensure_directory(INDICES_ROOT)
+    cache_path = os.path.join(INDICES_ROOT, f"{experiment_name}_embeddings.npy")
 
-    # 1. Load Chunks
-    chunk_texts = load_chunks_text_only(chunks_file)
-    count = len(chunk_texts)
+    if os.path.exists(cache_path):
+        tprint(f"   💾 Loading cached embeddings from {cache_path}...")
+        try:
+            return np.load(cache_path)
+        except Exception as e:
+            tprint(f"   ⚠️ Cache corrupt, rebuilding: {e}")
 
-    if count == 0:
-        tprint(f"❌ No chunks found in {experiment_name}")
-        return
+    tprint(f"   ⚙️  Encoding {len(chunk_texts)} chunks...")
+    embeddings = model.encode(
+        chunk_texts,
+        normalize_embeddings=True,
+        convert_to_numpy=True,
+        show_progress_bar=True,
+        batch_size=BATCH_SIZE
+    )
 
-    tprint(f"   🔹 Vectorizing {count} chunks (Batch Size: {BATCH_SIZE})...")
+    # Save for next time (Resume capability)
+    np.save(cache_path, embeddings)
+    return embeddings
 
-    # 2. Vectorize ALL chunks (The Corpus)
-    # CHANGED: show_progress_bar=True to identify hangs
-    try:
-        corpus_embeddings = model.encode(
-            chunk_texts,
-            normalize_embeddings=True,
-            convert_to_numpy=True,
-            show_progress_bar=True,
-            batch_size=BATCH_SIZE
-        )
-    except Exception as e:
-        tprint(f"    ❌ Encoding Error: {e}")
-        return
 
-    # Free text memory immediately
-    del chunk_texts
-    gc.collect()
-
-    # Safety cast
-    corpus_embeddings = np.ascontiguousarray(corpus_embeddings, dtype=np.float32)
+def evaluate_metrics(experiment_name, corpus_embeddings, chunk_texts, gold_data, query_embeddings, results_accumulator):
     d = corpus_embeddings.shape[1]
 
-    # 3. Select Samples
-    if count > SAMPLE_SIZE:
-        query_indices = random.sample(range(count), SAMPLE_SIZE)
-    else:
-        query_indices = list(range(count))
+    # Metric Factory
+    metric_map = {
+        "IP (Cosine)": faiss.IndexFlatIP(d),
+        "L2 (Euclidean)": faiss.IndexFlatL2(d),
+        "L1 (Manhattan)": faiss.IndexFlat(d, faiss.METRIC_L1),
+        "Linf (Chebyshev)": faiss.IndexFlat(d, faiss.METRIC_Linf)
+    }
 
-    query_vecs = corpus_embeddings[query_indices]
-    query_vecs = np.ascontiguousarray(query_vecs, dtype=np.float32)
+    n_gold = len(gold_data)
 
-    # 4. Metric Loop
-    def get_index(name, dim):
-        if name == "IP (Cosine)": return faiss.IndexFlatIP(dim)
-        if name == "L2 (Euclidean)": return faiss.IndexFlatL2(dim)
-        if name == "L1 (Manhattan)": return faiss.IndexFlat(dim, faiss.METRIC_L1)
-        if name == "Linf (Chebyshev)": return faiss.IndexFlat(dim, faiss.METRIC_Linf)
-        return None
-
-    metric_names = ["IP (Cosine)", "L2 (Euclidean)", "L1 (Manhattan)", "Linf (Chebyshev)"]
-
-    # Calculate one by one to save memory
-    for name in metric_names:
+    for metric_name, index in metric_map.items():
+        # tprint(f"      🔎 Testing {metric_name}...")
         try:
-            index = get_index(name, d)
+            # 1. Build Index (Instant for Flat)
             index.add(corpus_embeddings)
 
-            k = 2 if count >= 2 else 1
-            distances, retrieved_ids = index.search(query_vecs, k)
+            # 2. Batch Search
+            distances, retrieved_indices = index.search(query_embeddings, TOP_K)
 
-            self_hits = 0
-            neighbor_dists = []
+            # 3. Calculate Evaluation Metrics
+            sums = {"mrr": 0.0, "ndcg_at_k": 0.0, "precision_at_k": 0.0, "recall_at_k": 0.0, "f1_score_at_k": 0.0}
 
-            for i, q_idx in enumerate(query_indices):
-                # Self retrieval check
-                if len(retrieved_ids[i]) > 0 and retrieved_ids[i][0] == q_idx:
-                    self_hits += 1
+            for i, gold_item in enumerate(gold_data):
+                retrieved_ids = retrieved_indices[i]
 
-                # Neighbor distance
-                if len(distances[i]) >= 2:
-                    neighbor_dists.append(distances[i][1])
-                elif len(distances[i]) == 1 and retrieved_ids[i][0] != q_idx:
-                    neighbor_dists.append(distances[i][0])
+                # Retrieve actual text for checking against gold
+                retrieved_texts = []
+                for rid in retrieved_ids:
+                    if 0 <= rid < len(chunk_texts):
+                        retrieved_texts.append(chunk_texts[rid])
 
-            avg_neighbor_dist = float(np.mean(neighbor_dists)) if neighbor_dists else 0.0
-            self_retrieval_accuracy = self_hits / len(query_indices) if query_indices else 0
+                # Use your existing evaluation.py logic
+                scores = calculate_metrics(
+                    retrieved_chunks=retrieved_texts,
+                    gold_passages=gold_item['gold_passages'],
+                    k=TOP_K
+                )
 
+                for k in sums:
+                    sums[k] += scores.get(k, 0.0)
+
+            # 4. Average and Store
             row = {
                 "Experiment": experiment_name,
-                "Chunk_Count": count,
-                "Distance_Metric": name,
-                "Self_Retrieval_Acc": round(self_retrieval_accuracy, 4),
-                "Avg_Neighbor_Dist": round(avg_neighbor_dist, 4)
+                "Distance_Metric": metric_name,
+                "Chunks_Count": len(chunk_texts),
+                "MRR": round(sums["mrr"] / n_gold, 4),
+                "NDCG@10": round(sums["ndcg_at_k"] / n_gold, 4),
+                "Precision@10": round(sums["precision_at_k"] / n_gold, 4),
+                "Recall@10": round(sums["recall_at_k"] / n_gold, 4),
+                "F1@10": round(sums["f1_score_at_k"] / n_gold, 4)
             }
             results_accumulator.append(row)
 
-            # Clean up index
+            # Cleanup
             del index
             gc.collect()
 
         except Exception as e:
-            tprint(f"    ⚠️ Error calculating {name}: {e}")
-
-    # Final cleanup
-    del corpus_embeddings
-    del query_vecs
-    gc.collect()
+            tprint(f"      ❌ Error in {metric_name}: {e}")
 
 
 def main():
@@ -187,34 +220,66 @@ def main():
         tprint(f"❌ Chunks root not found at {CHUNKS_ROOT}")
         return
 
+    # 1. Load Gold Data
+    gold_data = load_gold_data(GOLD_DATA_PATH)
+    if not gold_data:
+        tprint("❌ No gold data found.")
+        return
+    tprint(f"✅ Loaded {len(gold_data)} Gold Questions.")
+
+    # 2. Get Experiments
     experiments = [d for d in os.listdir(CHUNKS_ROOT) if os.path.isdir(os.path.join(CHUNKS_ROOT, d))]
     experiments.sort()
 
-    if not experiments:
-        tprint("❌ No experiment folders found.")
-        return
-
+    # 3. Load Model
     device = get_device()
-    tprint(f"🔹 Found {len(experiments)} experiments. Loading Model {MODEL_NAME} onto {device}...")
-
     model = SentenceTransformer(MODEL_NAME, device=device)
+
+    # 4. Pre-encode Gold Questions (Query Embeddings)
+    # They are the same for every experiment, encode once.
+    tprint("🔹 Encoding Gold Questions...")
+    questions = [g['question'] for g in gold_data]
+    query_embeddings = model.encode(questions, normalize_embeddings=True, convert_to_numpy=True, batch_size=BATCH_SIZE)
+    query_embeddings = np.ascontiguousarray(query_embeddings, dtype=np.float32)
+
     all_results = []
 
-    for exp in tqdm(experiments, desc="Batch Progress", unit="exp"):
+    # 5. Main Loop
+    for exp in tqdm(experiments, desc="Experiments", unit="exp"):
         chunks_file = os.path.join(CHUNKS_ROOT, exp, "chunks.json")
-        if os.path.exists(chunks_file):
-            process_single_experiment(exp, chunks_file, model, all_results)
+        if not os.path.exists(chunks_file): continue
 
+        tprint(f"\n🚀 Experiment: {exp}")
+
+        # Load Text (Required for Calculate Metrics)
+        chunk_texts = load_chunks_text_only(chunks_file)
+        if not chunk_texts: continue
+
+        # Load/Create Cache (Vectors)
+        embeddings = get_or_create_embeddings(exp, chunk_texts, model)
+
+        # Ensure contiguous float32 for Faiss
+        embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
+
+        # Run Evaluation
+        evaluate_metrics(exp, embeddings, chunk_texts, gold_data, query_embeddings, all_results)
+
+        # Free Memory
+        del chunk_texts
+        del embeddings
+        gc.collect()
+        if device == "cuda": torch.cuda.empty_cache()
+        if device == "mps": torch.mps.empty_cache()
+
+    # 6. Save Final CSV
     if all_results:
-        tprint(f"\n💾 Saving density analysis to {CSV_OUTPUT_FILE}...")
-        fieldnames = ["Experiment", "Chunk_Count", "Distance_Metric", "Self_Retrieval_Acc", "Avg_Neighbor_Dist"]
+        tprint(f"\n💾 Saving comparison to {CSV_OUTPUT_FILE}...")
+        keys = all_results[0].keys()
         with open(CSV_OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer = csv.DictWriter(f, fieldnames=keys)
             writer.writeheader()
             writer.writerows(all_results)
         tprint("✅ Done.")
-    else:
-        tprint("⚠️ No results gathered.")
 
 
 if __name__ == "__main__":
