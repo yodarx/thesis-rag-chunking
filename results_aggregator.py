@@ -141,7 +141,10 @@ class ResultProcessor:
             if folder.is_dir() and "archive" not in folder.name:
                 all_rows.extend(self._process_experiment_folder(folder))
 
-        return pd.DataFrame(all_rows)
+        df = pd.DataFrame(all_rows)
+        if "chunking_time_s" in df.columns:
+            df = df.drop(columns=["chunking_time_s"])
+        return df
 
     def _process_experiment_folder(self, folder_path: Path) -> list[dict[str, Any]]:
         folder_name = folder_path.name
