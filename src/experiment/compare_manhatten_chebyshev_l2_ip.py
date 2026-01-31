@@ -57,13 +57,14 @@ def tprint(msg):
 
 
 # --- 4. CONFIGURATION ---
-CHUNKS_ROOT = "data/chunks"
-GOLD_DATA_PATH = "data/preprocessed/gold.jsonl"
-INDICES_ROOT = "data/indices/compare_distance"
+CHUNKS_ROOT = "../../data/chunks"
+GOLD_DATA_PATH = "../../data/preprocessed/gold.jsonl"
+INDICES_ROOT = "../../data/indices/compare_distance"
 CSV_OUTPUT_FILE = "distance_metric_full_evaluation.csv"
 MODEL_NAME = "all-MiniLM-L6-v2"
 BATCH_SIZE = 32
-TOP_K = 10
+TOP_K = 10  # We evaluate Precision/Recall @ 10
+
 
 def get_device():
     if torch.cuda.is_available():
