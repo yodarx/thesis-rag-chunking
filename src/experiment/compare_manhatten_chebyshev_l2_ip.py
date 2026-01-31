@@ -1,13 +1,33 @@
-import csv
-import gc
-import json
 import os
 import sys
 
+# --- 1. PATH SETUP (Must be first) ---
+# Add the parent directory (src/) to sys.path so we can import 'evaluation.py'
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)  # Points to 'src/'
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
+# --- 2. IMPORT CUSTOM MODULES ---
+try:
+    # Attempt to import based on file location src/evaluation.py
+    from evaluation import calculate_metrics
+except ImportError:
+    try:
+        # Fallback if it is inside a package src/evaluation/evaluation.py
+        from evaluation.evaluation import calculate_metrics
+    except ImportError:
+        print("❌ Error: Could not import 'calculate_metrics'. Ensure 'evaluation.py' is in the 'src' folder.")
+        sys.exit(1)
+
+# --- 3. STANDARD & THIRD PARTY IMPORTS ---
+import csv
+import gc
+import json
 import numpy as np
 import torch
 
-# --- 1. ENVIRONMENT SAFETY (MacOS/Faiss) ---
+# --- 4. ENVIRONMENT SAFETY (MacOS/Faiss) ---
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -18,25 +38,7 @@ faiss.omp_set_num_threads(1)
 
 from sentence_transformers import SentenceTransformer
 
-# --- 2. IMPORT EVALUATION MODULE (MOVED UP) ---
-# We must add the parent directory to sys.path BEFORE importing the custom module
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir) # Pointing to src/
-sys.path.append(parent_dir)
-
-try:
-    # Try importing assuming src/evaluation.py exists
-    from evaluation import calculate_metrics
-except ImportError:
-    try:
-        # Try importing assuming src/evaluation/evaluation.py exists
-        from evaluation.evaluation import calculate_metrics
-    except ImportError:
-        print("❌ Error: Could not import 'calculate_metrics'. Ensure 'evaluation.py' is in the 'src' folder.")
-        sys.exit(1)
-
-
-# --- 3. PROGRESS BAR SETUP ---
+# --- 5. PROGRESS BAR SETUP ---
 try:
     from tqdm import tqdm
 
@@ -56,14 +58,14 @@ def tprint(msg):
         print(msg)
 
 
-# --- 4. CONFIGURATION ---
+# --- 6. CONFIGURATION ---
 CHUNKS_ROOT = "../../data/chunks"
 GOLD_DATA_PATH = "../../data/preprocessed/gold.jsonl"
 INDICES_ROOT = "../../data/indices/compare_distance"
 CSV_OUTPUT_FILE = "distance_metric_full_evaluation.csv"
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "all-MiniLM-L6-v2"  # Preserved from your active file
 BATCH_SIZE = 32
-TOP_K = 10  # We evaluate Precision/Recall @ 10
+TOP_K = 10
 
 
 def get_device():
@@ -170,9 +172,8 @@ def evaluate_metrics(experiment_name, corpus_embeddings, chunk_texts, gold_data,
     n_gold = len(gold_data)
 
     for metric_name, index in metric_map.items():
-        # tprint(f"      🔎 Testing {metric_name}...")
         try:
-            # 1. Build Index (Instant for Flat)
+            # 1. Build Index (Instant for Flat indexes)
             index.add(corpus_embeddings)
 
             # 2. Batch Search
@@ -190,7 +191,7 @@ def evaluate_metrics(experiment_name, corpus_embeddings, chunk_texts, gold_data,
                     if 0 <= rid < len(chunk_texts):
                         retrieved_texts.append(chunk_texts[rid])
 
-                # Use your existing evaluation.py logic
+                # Use your existing evaluation.py logic (string matching)
                 scores = calculate_metrics(
                     retrieved_chunks=retrieved_texts,
                     gold_passages=gold_item['gold_passages'],
@@ -242,9 +243,14 @@ def main():
     model = SentenceTransformer(MODEL_NAME, device=device)
 
     # 4. Pre-encode Gold Questions (Query Embeddings)
-    # They are the same for every experiment, encode once.
     tprint("🔹 Encoding Gold Questions...")
     questions = [g['question'] for g in gold_data]
+
+    # Check if questions exist
+    if len(questions) == 0:
+        tprint("❌ No valid questions found in gold data.")
+        return
+
     query_embeddings = model.encode(questions, normalize_embeddings=True, convert_to_numpy=True, batch_size=BATCH_SIZE)
     query_embeddings = np.ascontiguousarray(query_embeddings, dtype=np.float32)
 
