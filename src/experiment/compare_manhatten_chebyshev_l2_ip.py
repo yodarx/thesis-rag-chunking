@@ -7,8 +7,6 @@ import sys
 import numpy as np
 import torch
 
-from evaluation.evaluation import calculate_metrics
-
 # --- 1. ENVIRONMENT SAFETY (MacOS/Faiss) ---
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -20,11 +18,22 @@ faiss.omp_set_num_threads(1)
 
 from sentence_transformers import SentenceTransformer
 
-# --- 2. IMPORT EVALUATION MODULE ---
-# Append parent directory (src/) to sys.path to find evaluation.py
+# --- 2. IMPORT EVALUATION MODULE (MOVED UP) ---
+# We must add the parent directory to sys.path BEFORE importing the custom module
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
+parent_dir = os.path.dirname(current_dir) # Pointing to src/
 sys.path.append(parent_dir)
+
+try:
+    # Try importing assuming src/evaluation.py exists
+    from evaluation import calculate_metrics
+except ImportError:
+    try:
+        # Try importing assuming src/evaluation/evaluation.py exists
+        from evaluation.evaluation import calculate_metrics
+    except ImportError:
+        print("❌ Error: Could not import 'calculate_metrics'. Ensure 'evaluation.py' is in the 'src' folder.")
+        sys.exit(1)
 
 
 # --- 3. PROGRESS BAR SETUP ---
