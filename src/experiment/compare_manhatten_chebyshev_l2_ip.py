@@ -97,8 +97,8 @@ def load_gold_data(filepath):
             if not line.strip(): continue
             try:
                 row = json.loads(line)
-                q = row.get('question') or row.get('query')
-                g = row.get('gold_passage') or row.get('positive') or row.get('passages')
+                q = row.get('question')
+                g = row.get('gold_passages')
 
                 # Normalize gold to list
                 if isinstance(g, str): g = [g]
